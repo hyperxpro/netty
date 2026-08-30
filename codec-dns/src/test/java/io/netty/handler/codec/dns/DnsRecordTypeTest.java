@@ -83,4 +83,37 @@ public class DnsRecordTypeTest {
             assertSame(t, found, t.name());
         }
     }
+
+    /**
+     * Pins the code points against the IANA "Resource Record (RR) TYPEs" registry. {@link #testFind()}
+     * proves a constant is registered, but a transposed number would still round-trip through
+     * {@link DnsRecordType#valueOf(int)}, so the values themselves are asserted literally.
+     */
+    @Test
+    public void testDnssecRelatedCodePoints() {
+        assertEquals(43, DnsRecordType.DS.intValue());
+        assertEquals(46, DnsRecordType.RRSIG.intValue());
+        assertEquals(47, DnsRecordType.NSEC.intValue());
+        assertEquals(48, DnsRecordType.DNSKEY.intValue());
+        assertEquals(50, DnsRecordType.NSEC3.intValue());
+        assertEquals(51, DnsRecordType.NSEC3PARAM.intValue());
+        assertEquals(52, DnsRecordType.TLSA.intValue());
+        assertEquals(53, DnsRecordType.SMIMEA.intValue());
+        assertEquals(59, DnsRecordType.CDS.intValue());
+        assertEquals(60, DnsRecordType.CDNSKEY.intValue());
+        assertEquals(61, DnsRecordType.OPENPGPKEY.intValue());
+        assertEquals(62, DnsRecordType.CSYNC.intValue());
+        assertEquals(63, DnsRecordType.ZONEMD.intValue());
+    }
+
+    /**
+     * An unassigned code point must still decode, as an unregistered instance rather than by throwing.
+     * See {@link DnsRecordType#valueOf(int)}.
+     */
+    @Test
+    public void testUnassignedCodePointDecodesAsUnknown() {
+        DnsRecordType unassigned = DnsRecordType.valueOf(0x0fff);
+        assertEquals(0x0fff, unassigned.intValue());
+        assertEquals("UNKNOWN", unassigned.name());
+    }
 }

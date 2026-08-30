@@ -65,6 +65,18 @@ public class DnsQueryTest {
                 Arguments.of(DnsOpCode.valueOf(16), false, 0x0000));
     }
 
+    static Stream<Arguments> zValuesAndExpectedFlags() {
+        return Stream.of(
+                // RFC 1035 section 4.1.1 puts Z at bits 6-4. RFC 4035 then assigned the low two of those
+                // three bits: AD is bit 5 and CD is bit 4, leaving only bit 6 reserved.
+                Arguments.of(0, 0x0000),
+                Arguments.of(1, 0x0010),   // CD
+                Arguments.of(2, 0x0020),   // AD
+                Arguments.of(3, 0x0030),   // AD + CD
+                Arguments.of(4, 0x0040),   // the still-reserved bit
+                Arguments.of(7, 0x0070));
+    }
+
     @Test
     public void testEncodeAndDecodeQuery() {
         InetSocketAddress addr = SocketUtils.socketAddress("8.8.8.8", 53);
@@ -151,5 +163,94 @@ public class DnsQueryTest {
 
         assertTrue(packet.release());
         assertFalse(writeChannel.finish());
+    }
+
+    @ParameterizedTest
+    @MethodSource("zValuesAndExpectedFlags")
+    public void testZIsEncodedIntoBits6To4(int z, int expectedFlags) {
+        InetSocketAddress addr = SocketUtils.socketAddress("8.8.8.8", 53);
+        EmbeddedChannel writeChannel = new EmbeddedChannel(new DatagramDnsQueryEncoder());
+
+        DnsQuery query = new DatagramDnsQuery(null, addr, 1).setZ(z);
+        query.setRecord(DnsSection.QUESTION, new DefaultDnsQuestion("example.com", DnsRecordType.A));
+
+        assertTrue(writeChannel.writeOutbound(query));
+        DatagramPacket packet = writeChannel.readOutbound();
+        assertEquals(expectedFlags, packet.content().getUnsignedShort(2));
+
+        assertTrue(packet.release());
+        assertFalse(writeChannel.finish());
+    }
+
+    @ParameterizedTest
+    @MethodSource("zValuesAndExpectedFlags")
+    public void testZSurvivesEncodeAndDecode(int z, int expectedFlags) {
+        InetSocketAddress addr = SocketUtils.socketAddress("8.8.8.8", 53);
+        EmbeddedChannel writeChannel = new EmbeddedChannel(new DatagramDnsQueryEncoder());
+        EmbeddedChannel readChannel = new EmbeddedChannel(new DatagramDnsQueryDecoder());
+
+        DnsQuery query = new DatagramDnsQuery(null, addr, 1).setZ(z);
+        query.setRecord(DnsSection.QUESTION, new DefaultDnsQuestion("example.com", DnsRecordType.A));
+
+        assertTrue(writeChannel.writeOutbound(query));
+        assertTrue(readChannel.writeInbound(writeChannel.<DatagramPacket>readOutbound()));
+
+        DnsQuery decoded = readChannel.readInbound();
+        assertEquals(z, decoded.z());
+        assertEquals((z & 0x2) != 0, decoded.isAuthenticData());
+        assertEquals((z & 0x1) != 0, decoded.isCheckingDisabled());
+        assertTrue(decoded.release());
+
+        assertFalse(writeChannel.finish());
+        assertFalse(readChannel.finish());
+    }
+
+    /**
+     * A validating resolver sets {@code CD} on every upstream query (RFC 6840, section 5.9); before the
+     * encoder wrote {@code Z} that was impossible to express.
+     */
+    @Test
+    public void testCheckingDisabledReachesTheWire() {
+        InetSocketAddress addr = SocketUtils.socketAddress("8.8.8.8", 53);
+        EmbeddedChannel writeChannel = new EmbeddedChannel(new DatagramDnsQueryEncoder());
+
+        DnsQuery query = new DatagramDnsQuery(null, addr, 1);
+        query.setCheckingDisabled(true);
+        query.setRecord(DnsSection.QUESTION, new DefaultDnsQuestion("example.com", DnsRecordType.A));
+
+        assertTrue(query.isCheckingDisabled());
+        assertFalse(query.isAuthenticData());
+        assertTrue(writeChannel.writeOutbound(query));
+
+        DatagramPacket packet = writeChannel.readOutbound();
+        assertEquals(0x0010, packet.content().getUnsignedShort(2));
+
+        assertTrue(packet.release());
+        assertFalse(writeChannel.finish());
+    }
+
+    @Test
+    public void testAuthenticDataAndCheckingDisabledAreIndependent() {
+        InetSocketAddress addr = SocketUtils.socketAddress("8.8.8.8", 53);
+        DnsQuery query = new DatagramDnsQuery(null, addr, 1);
+
+        query.setAuthenticData(true);
+        assertTrue(query.isAuthenticData());
+        assertFalse(query.isCheckingDisabled());
+        assertEquals(0x2, query.z());
+
+        query.setCheckingDisabled(true);
+        assertTrue(query.isAuthenticData());
+        assertTrue(query.isCheckingDisabled());
+        assertEquals(0x3, query.z());
+
+        // Clearing one must leave the other, and must leave the still-reserved bit 6 alone.
+        query.setZ(0x7);
+        query.setAuthenticData(false);
+        assertEquals(0x5, query.z());
+        query.setCheckingDisabled(false);
+        assertEquals(0x4, query.z());
+
+        assertTrue(query.release());
     }
 }

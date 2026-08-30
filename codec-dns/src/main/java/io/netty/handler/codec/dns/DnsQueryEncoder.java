@@ -52,6 +52,11 @@ final class DnsQueryEncoder {
         if (query.isRecursionDesired()) {
             flags |= 1 << 8;
         }
+        // Z occupies bits 6-4 and carries AD and CD (RFC 4035, sections 3.2.2 and 3.2.3). Without this a
+        // caller's setZ(...) / setCheckingDisabled(...) would be silently dropped on the wire, which in turn
+        // makes it impossible to ask an upstream resolver not to filter DNSSEC records on our behalf.
+        // DnsMessageUtil.encodeDnsResponse(...) already does the same for responses.
+        flags |= (query.z() & 0x7) << 4;
         buf.writeShort(flags);
         buf.writeShort(query.count(DnsSection.QUESTION));
         buf.writeShort(0); // answerCount

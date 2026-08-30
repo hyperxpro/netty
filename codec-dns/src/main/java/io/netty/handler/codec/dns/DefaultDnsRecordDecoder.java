@@ -65,9 +65,40 @@ public class DefaultDnsRecordDecoder implements DnsRecordDecoder {
         }
 
         @SuppressWarnings("unchecked")
-        T record = (T) decodeRecord(name, type, aClass, ttl, in, offset, length);
+        T record = (T) decodeRecord(name, type, aClass, ttl, in, offset, length, startOffset);
         in.readerIndex(offset + length);
         return record;
+    }
+
+    /**
+     * Decodes a record from the information decoded so far by {@link #decodeRecord(ByteBuf)}, additionally given the
+     * offset the record's owner name starts at.
+     * <p>
+     * This exists because {@code name} has already been through
+     * {@link #decodeName(ByteBuf)}, which renders each label as UTF-8 text. That is lossy for labels holding
+     * arbitrary octets, and DNSSEC signatures are computed over the exact wire octets of the owner name, so a
+     * DNSSEC-aware decoder has to read the name again from {@code in} rather than re-encode the {@link String}.
+     * The end of the message, needed to resolve compression pointers, is {@code in.writerIndex()}.
+     * <p>
+     * The default implementation delegates to
+     * {@link #decodeRecord(String, DnsRecordType, int, long, ByteBuf, int, int)}, so overriding either method
+     * works; override this one when the owner name's wire form matters.
+     *
+     * @param name the domain name of the record
+     * @param type the type of the record
+     * @param dnsClass the class of the record
+     * @param timeToLive the TTL of the record
+     * @param in the {@link ByteBuf} that contains the whole message
+     * @param offset the start offset of the RDATA in {@code in}
+     * @param length the length of the RDATA
+     * @param nameOffset the start offset of the record's owner name in {@code in}
+     *
+     * @return the decoded record.
+     */
+    protected DnsRecord decodeRecord(
+            String name, DnsRecordType type, int dnsClass, long timeToLive,
+            ByteBuf in, int offset, int length, int nameOffset) throws Exception {
+        return decodeRecord(name, type, dnsClass, timeToLive, in, offset, length);
     }
 
     /**
