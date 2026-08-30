@@ -54,6 +54,10 @@ public interface DnsMessage extends ReferenceCounted {
 
     /**
      * Returns the {@code Z} (reserved for future use) field of this DNS message.
+     * <p>
+     * Despite the name, only the most significant of these three bits is still reserved. RFC 4035 assigned the
+     * other two to {@code AD} and {@code CD}; prefer {@link #isAuthenticData()} and {@link #isCheckingDisabled()}
+     * over decoding them out of this value by hand.
      */
     int z();
 
@@ -61,6 +65,53 @@ public interface DnsMessage extends ReferenceCounted {
      * Sets the {@code Z} (reserved for future use) field of this DNS message.
      */
     DnsMessage setZ(int z);
+
+    /**
+     * Returns the {@code AD} (authentic data) bit of this DNS message.
+     * <p>
+     * On a <em>response</em>, a security-aware name server sets this bit to assert that it considers everything
+     * in the answer and authority sections to be authentic, per
+     * <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-3.2.3">RFC 4035, section 3.2.3</a>. On a
+     * <em>query</em> it instead signals that the requester understands and is interested in the value of the
+     * {@code AD} bit in the response, per
+     * <a href="https://www.rfc-editor.org/rfc/rfc6840.html#section-5.7">RFC 6840, section 5.7</a>.
+     * <p>
+     * <strong>The {@code AD} bit is not itself authenticated.</strong> It is an unsigned header bit, so an
+     * on-path attacker can set it at will. Do not rely on it unless the data was obtained from a trusted
+     * security-aware recursive name server over a secure channel — see
+     * <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-4.9.3">RFC 4035, section 4.9.3</a>, which
+     * states that a security-aware stub resolver {@code MUST NOT} place any reliance on it otherwise.
+     */
+    default boolean isAuthenticData() {
+        return (z() & 0x2) != 0;
+    }
+
+    /**
+     * Sets the {@code AD} (authentic data) bit of this DNS message. See {@link #isAuthenticData()}.
+     */
+    default DnsMessage setAuthenticData(boolean authenticData) {
+        return setZ(authenticData ? z() | 0x2 : z() & ~0x2);
+    }
+
+    /**
+     * Returns the {@code CD} (checking disabled) bit of this DNS message.
+     * <p>
+     * A requester sets this bit to ask that the server not suppress data that fails DNSSEC validation, so that
+     * the requester can validate for itself. A resolver that performs its own validation {@code SHOULD} set it
+     * on every upstream query, per
+     * <a href="https://www.rfc-editor.org/rfc/rfc6840.html#section-5.9">RFC 6840, section 5.9</a> — without it
+     * an upstream validator filters out exactly the records needed to reach an independent verdict.
+     */
+    default boolean isCheckingDisabled() {
+        return (z() & 0x1) != 0;
+    }
+
+    /**
+     * Sets the {@code CD} (checking disabled) bit of this DNS message. See {@link #isCheckingDisabled()}.
+     */
+    default DnsMessage setCheckingDisabled(boolean checkingDisabled) {
+        return setZ(checkingDisabled ? z() | 0x1 : z() & ~0x1);
+    }
 
     /**
      * Returns the number of records in the specified {@code section} of this DNS message.
