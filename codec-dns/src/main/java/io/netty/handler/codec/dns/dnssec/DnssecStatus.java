@@ -23,7 +23,7 @@ package io.netty.handler.codec.dns.dnssec;
  * <p>The operative rule, stated plainly, because getting it wrong is how a half-finished validator turns into a
  * bypass: <strong>a failure to <em>prove</em> security is {@link #INSECURE} or {@link #INDETERMINATE}; only a proof
  * of <em>inconsistency</em> is {@link #BOGUS}.</strong> The two failure directions are not interchangeable and must
- * never be collapsed into a single "not secure" verdict:</p>
+ * never be collapsed into a single "not secure" verdict:
  * <ul>
  *   <li>Reporting a genuine forgery as {@link #INSECURE} hands the attacker the answer, because an application that
  *   treats <em>Insecure</em> as "this zone is simply unsigned" will use data a validator has already shown to be
@@ -34,7 +34,7 @@ package io.netty.handler.codec.dns.dnssec;
  *
  * <p>The direction in which a specific failure resolves is fixed by {@link DnssecFailureReason#impliedStatus()};
  * anything an attacker can provoke on demand, such as exhausting a work limit, must resolve to {@link #BOGUS} so
- * that provoking it is not a downgrade.</p>
+ * that provoking it is not a downgrade.
  */
 public enum DnssecStatus {
 
@@ -44,7 +44,7 @@ public enum DnssecStatus {
      *
      * <p>This is the only state in which the data may be relied on as authentic. It is also the only state that
      * justifies setting the {@code AD} bit on a response, see
-     * <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-3.2.3">RFC 4035, Section 3.2.3</a>.</p>
+     * <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-3.2.3">RFC 4035, Section 3.2.3</a>.
      */
     SECURE,
 
@@ -59,7 +59,7 @@ public enum DnssecStatus {
      * <a href="https://www.rfc-editor.org/rfc/rfc6840.html#section-5.2">RFC 6840, Section 5.2</a> for a delegation
      * whose {@code DS} records all use algorithms or digest types the validator cannot evaluate. A validator that
      * simply gave up must not report {@code INSECURE}: that would let anyone able to induce the failure strip DNSSEC
-     * protection from a signed zone.</p>
+     * protection from a signed zone.
      */
     INSECURE,
 
@@ -71,7 +71,7 @@ public enum DnssecStatus {
      *
      * <p>RFC 4033 notes that this may indicate an attack, but may equally be a configuration error or data
      * corruption. Either way the data must not be returned to the application; a resolver answers {@code SERVFAIL},
-     * per <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-5.5">RFC 4035, Section 5.5</a>.</p>
+     * per <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-5.5">RFC 4035, Section 5.5</a>.
      */
     BOGUS,
 
@@ -84,7 +84,7 @@ public enum DnssecStatus {
      * data it needed never arrived, for example a {@code DS} or {@code DNSKEY} lookup that failed or timed out.
      * {@code INDETERMINATE} is <strong>not</strong> a licence to serve the data as if it had been checked: it means
      * "unknown", not "unsigned". A resolver that cannot complete validation answers {@code SERVFAIL} rather than
-     * downgrading the answer to {@link #INSECURE}.</p>
+     * downgrading the answer to {@link #INSECURE}.
      */
     INDETERMINATE
 }

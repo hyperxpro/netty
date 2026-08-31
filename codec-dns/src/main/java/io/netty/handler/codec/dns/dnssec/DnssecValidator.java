@@ -49,9 +49,7 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>This is the piece that turns the rest of the package into a validating stub resolver. The lookups it needs on
  * the way down are supplied by a {@link DnssecRecordFetcher}, so that {@code codec-dns} performs no I/O of its
- * own.</p>
- *
- * <h3>The rule the whole design turns on</h3>
+ * own.
  *
  * <p><strong>A failure to <em>prove</em> security is {@link DnssecStatus#INSECURE} or
  * {@link DnssecStatus#INDETERMINATE}; only a proof of <em>inconsistency</em> is {@link DnssecStatus#BOGUS}.</strong>
@@ -60,12 +58,10 @@ import java.util.concurrent.TimeUnit;
  * Bogus breaks most of the DNS and gets validation switched off. So Insecure is only ever reached through an actual
  * proof — an authenticated denial of the {@code DS} RRset at a delegation, an opt-out span, or a delegation whose
  * {@code DS} records name only algorithms this build cannot evaluate (RFC 6840, Section 5.2) — and never by giving
- * up.</p>
+ * up.
  *
  * <p>Exceeding any of the {@link DnssecLimits} is Bogus for the same reason. If running out of budget were
- * Insecure, anyone able to force a limit breach would have a downgrade oracle.</p>
- *
- * <h3>What the validator will and will not look at</h3>
+ * Insecure, anyone able to force a limit breach would have a downgrade oracle.
  *
  * <ol>
  *   <li>The response's question must be the question that was asked. A response that answers something else is
@@ -84,9 +80,13 @@ import java.util.concurrent.TimeUnit;
  *   <li>An RRset is only ever verified against the keys of the zone the <em>chain walk</em> arrived at, and only
  *   if its owner name lies within that zone. The Signer's Name an {@code RRSIG} claims is never what decides which
  *   zone a record belongs to.</li>
+ *   <li>A {@code DS} RRset is parent-side data, so a {@code DS} query is answered by the parent: the walk stops
+ *   above the delegation at the queried name rather than descending through it. An authority section is read as a
+ *   referral only when the queried name lies under the delegation it carries.</li>
+ *   <li>Only a signature that covers the owner name a record arrived under authenticates that owner name. A
+ *   wildcard-expanded signature covers a name above it and verifies under any owner, so it can authenticate an
+ *   answer, which then needs a denial of existence with it, and nothing whose meaning is its owner name.</li>
  * </ol>
- *
- * <h3>No resumable state machine</h3>
  *
  * <p>The walk is a chain of ordinary asynchronous continuations over an immutable context. Nothing deep-copies or
  * resumes partially validated message state, and no section counts are maintained alongside the lists they
@@ -95,35 +95,31 @@ import java.util.concurrent.TimeUnit;
  * execution from a dangling pointer left across a suspended {@code DS} sub-query) and
  * <a href="https://www.cve.org/CVERecord?id=CVE-2026-42959">CVE-2026-42959</a> (a write offset counted separately
  * from the array it indexed) came from. Java removes the memory unsafety but not the logical desync, so the answer
- * here is to bound the work hard and fail rather than to save and restore it.</p>
+ * here is to bound the work hard and fail rather than to save and restore it.
  *
  * <p>One {@link DnssecBudget} is created per {@code validate} call and threaded through every path. Nothing resets
  * it, which is what Unbound's <a href="https://www.cve.org/CVERecord?id=CVE-2026-50045">CVE-2026-50045</a> got
- * wrong, and its counters are readable afterwards through {@link DnssecValidationResult#budget()}.</p>
- *
- * <h3>Threading and buffer lifetimes</h3>
+ * wrong, and its counters are readable afterwards through {@link DnssecValidationResult#budget()}.
  *
  * <p>A validator is immutable and shareable. Each call allocates its own state, its own budget and its own trace,
  * and every continuation runs on the {@link EventExecutor} passed to
  * {@link #validate(DnsName, DnsRecordType, DnsResponse, EventExecutor)}, so validation state is never touched from
  * two threads. A {@link DnssecRecordFetcher}'s future may complete anywhere; the validator hops back before
- * looking at anything.</p>
+ * looking at anything.
  *
  * <p><strong>The response may be released the instant {@code validate} returns.</strong> Everything the validation
  * needs from it is retained synchronously inside the call, before the first suspension, and released again from a
  * single hook that runs on success, on failure and on cancellation alike. {@link DnssecValidationResult} holds no
- * buffers at all, so a caller never has to release a verdict.</p>
+ * buffers at all, so a caller never has to release a verdict.
  *
  * <p>Nothing is published or cached until the whole chain has a verdict. The only exception is deliberate and is
  * itself a completed proof: an apex {@code DNSKEY} RRset goes into the {@link DnssecKeyCache} once a trust anchor
  * or a parent {@code DS} has matched one specific key and an {@code RRSIG} <em>made by that key</em> has validated
- * over the whole RRset.</p>
- *
- * <h3>Usage</h3>
+ * over the whole RRset.
  *
  * <p>The response must have been decoded with {@link DnssecDnsRecordDecoder}; records from the default decoder do
  * not carry the wire form of their owner names, so nothing signed over them can be reconstructed and validation
- * fails closed.</p>
+ * fails closed.
  *
  * <pre>{@code
  * DnssecValidator validator = DnssecValidator.newBuilder()
@@ -140,6 +136,7 @@ public final class DnssecValidator {
 
     private static final int TYPE_CNAME = DnsRecordType.CNAME.intValue();
     private static final int TYPE_DNAME = DnsRecordType.DNAME.intValue();
+    private static final int TYPE_DS = DnsRecordType.DS.intValue();
     private static final int TYPE_NS = DnsRecordType.NS.intValue();
     private static final int TYPE_SOA = DnsRecordType.SOA.intValue();
     private static final int TYPE_NSEC = DnsRecordType.NSEC.intValue();
@@ -232,7 +229,8 @@ public final class DnssecValidator {
      *
      * <p>Everything the validation needs is retained before this method returns, so {@code response} may be
      * released as soon as it does. The returned future completes on {@code executor} with a
-     * {@link DnssecValidationResult}; it fails only if {@code executor} refused to run the validation at all.</p>
+     * {@link DnssecValidationResult}; it fails only if {@code executor} refused to run the validation at all, and
+     * it cannot be cancelled.
      *
      * @param qname    the name that was asked about, in wire form. Not the name in the response: the two are
      *                 compared, and a response that answers a different question is rejected.
@@ -250,6 +248,10 @@ public final class DnssecValidator {
         ObjectUtil.checkNotNull(executor, "executor");
 
         Promise<DnssecValidationResult> promise = executor.newPromise();
+        // There is nothing a cancellation could stop: the walk is a chain of continuations over records already in
+        // hand, waiting only on fetches the caller supplied. Accepting one and carrying on regardless would leave
+        // the caller holding a future that says cancelled while the verdict goes nowhere.
+        promise.setUncancellable();
         // Retaining happens here, on the caller's thread, and not after a hop: otherwise the caller could release
         // the response in the window between this method returning and the hop running.
         Validation validation = new Validation(qname, qtype, response, executor, promise);
@@ -309,8 +311,10 @@ public final class DnssecValidator {
         private DnssecFailureReason startupReason;
         private String startupMessage;
 
-        private ScheduledFuture<?> timeoutTask;
-        private boolean finished;
+        // Both are written on the executor by complete() and read, and written, by abort() on whichever thread
+        // could not hand the validation over to it. Everything else here is confined to the executor.
+        private volatile ScheduledFuture<?> timeoutTask;
+        private volatile boolean finished;
 
         private List<DnsName> chainNames = Collections.emptyList();
         private int chainIndex;
@@ -389,20 +393,20 @@ public final class DnssecValidator {
         }
 
         /**
-         * Ends the validation because it could not be started at all, which in practice means the executor rejected
-         * it. Everything retained is released here, since no continuation will ever run to do it.
+         * Ends the validation because it could not be started, or could not be resumed, at all: in practice the
+         * executor refused to run it. Everything retained is released here, since no continuation will ever run to
+         * do it, and the wall-clock backstop is cancelled so that nothing is left scheduled against a validation
+         * that has ended.
          */
         void abort(Throwable cause) {
             if (finished) {
                 return;
             }
             finished = true;
+            cancelTimeout();
             releaseRetained();
             promise.tryFailure(cause);
         }
-
-        // -------------------------------------------------------------------------------------------------------
-        // Relevance
 
         /**
          * Rejects a response that does not answer the question that was asked. Done before anything in the message
@@ -447,9 +451,6 @@ public final class DnssecValidator {
                     || code.intValue() == DnsResponseCode.NXDOMAIN.intValue();
         }
 
-        // -------------------------------------------------------------------------------------------------------
-        // Chain of trust
-
         /**
          * Starts, or restarts after a {@code CNAME} or {@code DNAME}, the walk from the deepest trust anchor that
          * covers {@code name} down to {@code name} itself.
@@ -457,13 +458,14 @@ public final class DnssecValidator {
         private void resolveName(DnsName name) {
             budget.checkDeadline();
             currentName = name;
-            DnsName anchorName = trustAnchors.deepestAnchorName(name);
+            DnsName target = chainTarget(name);
+            DnsName anchorName = trustAnchors.deepestAnchorName(target);
             if (anchorName == null) {
-                complete(DnssecFailureReason.NO_TRUST_ANCHOR, "no trust anchor is configured for " + name
+                complete(DnssecFailureReason.NO_TRUST_ANCHOR, "no trust anchor is configured for " + target
                         + " or any of its ancestors, so this validator has no opinion about it");
                 return;
             }
-            List<DnssecTrustAnchor> configured = trustAnchors.anchorsFor(name);
+            List<DnssecTrustAnchor> configured = trustAnchors.anchorsFor(target);
             long now = clock.currentTimeMillis();
             List<DnssecTrustAnchor> usable = new ArrayList<DnssecTrustAnchor>(configured.size());
             int outsideWindow = 0;
@@ -489,12 +491,27 @@ public final class DnssecValidator {
                 return;
             }
             chainAnchors = usable;
-            chainNames = namesFrom(anchorName, name);
+            chainNames = namesFrom(anchorName, target);
             chainIndex = 0;
             signingZone = null;
             signingKeys = Collections.emptyList();
             trace("chain for " + name + " starts at the trust anchor for " + anchorName);
             stepChain();
+        }
+
+        /**
+         * The deepest name the walk has to reach before the answer can be judged: {@code name} itself, except for
+         * a {@code DS} query.
+         *
+         * <p>A {@code DS} RRset is parent-side data. It lives in the parent zone and only the parent signs it, see
+         * <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-5.2">RFC 4035, Section 5.2</a> and
+         * <a href="https://www.rfc-editor.org/rfc/rfc4034.html#section-5">RFC 4034, Section 5</a>. Descending
+         * through the cut at {@code name} and then verifying the answer with the child's own keys would let a
+         * child publish a {@code DS} for itself naming whatever key it liked, minting the parent-to-child link
+         * the chain of trust exists to establish. The root is its own parent and answers {@code . DS} itself.
+         */
+        private DnsName chainTarget(DnsName name) {
+            return qtype.intValue() == TYPE_DS ? name.parent() : name;
         }
 
         /**
@@ -563,9 +580,6 @@ public final class DnssecValidator {
             chainIndex++;
             stepChain();
         }
-
-        // -------------------------------------------------------------------------------------------------------
-        // The answer
 
         private void answerFor(DnsName name) {
             budget.checkDeadline();
@@ -656,8 +670,9 @@ public final class DnssecValidator {
             }
             DnssecVerificationResult result = verifier.verify(rrset, signingKeys, budget);
             if (!result.isSecure()) {
-                complete(result.reason(), "the " + what + " RRset " + rrset.owner() + ' ' + rrset.type()
-                        + " did not validate against the keys of " + signingZone + ": " + result.message());
+                complete(notADowngrade(result.reason()), "the " + what + " RRset " + rrset.owner() + ' '
+                        + rrset.type() + " did not validate against the keys of " + signingZone + ": "
+                        + result.message());
                 return false;
             }
             trace(what + ' ' + rrset.owner() + ' ' + rrset.type() + " verified: " + result.message());
@@ -714,9 +729,6 @@ public final class DnssecValidator {
             return true;
         }
 
-        // -------------------------------------------------------------------------------------------------------
-        // Negative answers and referrals
-
         private void negativeAnswer(DnsName name) {
             // Before anything else: a response with no answer for QNAME has no business carrying answer-section
             // records at all, and one that does gets the same treatment as a positive answer with an intruder in
@@ -724,7 +736,7 @@ public final class DnssecValidator {
             if (!checkAnswerSectionAccountedFor()) {
                 return;
             }
-            DnsRRset referral = findReferral();
+            DnsRRset referral = findReferral(name);
             List<DnsRecord> proof = collectProof(authorityRrsets, signingZone, signingKeys);
             if (proof == null) {
                 return;
@@ -767,7 +779,7 @@ public final class DnssecValidator {
                 return;
             }
             DnsRRset ds = findRRset(authorityRrsets, child, DnsRecordType.DS);
-            if (ds != null && verifier.verify(ds, signingKeys, budget).isSecure()) {
+            if (ds != null && authenticatesItsOwnerName(verifier.verify(ds, signingKeys, budget))) {
                 complete(DnssecFailureReason.DNSSEC_INDETERMINATE, "the response is a referral to the signed zone "
                         + child + " rather than an answer for " + name + ' ' + qtype);
                 return;
@@ -779,9 +791,16 @@ public final class DnssecValidator {
 
         /**
          * Returns the {@code NS} RRset of a referral, that is one owned by a strict subdomain of the zone the walk
-         * arrived at, in a response that carries no {@code SOA} of its own.
+         * arrived at and by an ancestor-or-equal of {@code name}, in a response that carries no {@code SOA} of its
+         * own.
+         *
+         * <p>The second half is the load-bearing one. A delegation {@code name} does not lie under is a statement
+         * about another branch of the zone and says nothing at all about this query, so honouring one lets a
+         * genuine, publicly fetchable referral for an unsigned sibling, replayed into this response, downgrade a
+         * name the walk has just proven is inside the signed zone. That is the relevance class of dnsjava's
+         * <a href="https://www.cve.org/CVERecord?id=CVE-2024-25638">CVE-2024-25638</a>.
          */
-        private DnsRRset findReferral() {
+        private DnsRRset findReferral(DnsName name) {
             DnsRRset referral = null;
             for (int i = 0; i < authorityRrsets.size(); i++) {
                 DnsRRset rrset = authorityRrsets.get(i);
@@ -789,14 +808,14 @@ public final class DnssecValidator {
                     return null;
                 }
                 if (rrset.type().intValue() == TYPE_NS && signingZone != null
-                        && rrset.owner().isStrictSubDomainOf(signingZone)) {
+                        && rrset.owner().isStrictSubDomainOf(signingZone)
+                        && name.equalsOrIsSubDomainOf(rrset.owner())) {
                     referral = rrset;
                 }
             }
             return referral;
         }
 
-        // -------------------------------------------------------------------------------------------------------
         // Denial-of-existence input
 
         /**
@@ -805,7 +824,7 @@ public final class DnssecValidator {
          * <p>{@link DnssecDenialOfExistence} does not check signatures, so this has to happen first: feeding it
          * records straight off the wire would let an attacker supply whatever proof suited them. Anything that does
          * not verify is left out, and why it did not is remembered so that the eventual failure names the real
-         * cause rather than "no proof".</p>
+         * cause rather than "no proof".
          *
          * @return the authenticated records, or {@code null} if the validation has been completed with a failure.
          */
@@ -826,22 +845,34 @@ public final class DnssecValidator {
                     return null;
                 }
                 DnssecVerificationResult result = verifier.verify(rrset, keys, budget);
-                if (result.isSecure()) {
+                if (!result.isSecure()) {
+                    rejectProofRecord(rrset, notADowngrade(result.reason()), result.message());
+                } else if (result.isWildcardExpanded()) {
+                    rejectProofRecord(rrset, DnssecFailureReason.DNSSEC_BOGUS, "its signature covers the wildcard "
+                            + result.signedOwner() + " and so verifies under any owner name, which is no proof "
+                            + "about this one (RFC 4035, Section 5.4)");
+                } else {
                     proof.addAll(rrset.records());
-                } else if (proofFailureReason == null) {
-                    proofFailureReason = result.reason();
-                    proofFailureMessage = rrset.owner() + " " + rrset.type() + ": " + result.message();
                 }
             }
             return proof;
         }
 
+        /**
+         * Leaves a record out of the proof and remembers why, so that the eventual failure names the real cause
+         * rather than "no proof". The first rejection is the one kept: it is the one nearest the record the
+         * verdict would have rested on.
+         */
+        private void rejectProofRecord(DnsRRset rrset, DnssecFailureReason reason, String message) {
+            if (proofFailureReason == null) {
+                proofFailureReason = reason;
+                proofFailureMessage = rrset.owner() + " " + rrset.type() + ": " + message;
+            }
+        }
+
         private String describeProofFailure() {
             return proofFailureMessage == null ? "" : " (a proof record was rejected: " + proofFailureMessage + ')';
         }
-
-        // -------------------------------------------------------------------------------------------------------
-        // Fetching
 
         private void fetch(DnsName name, DnsRecordType type, FetchListener listener) {
             Future<DnssecFetchResult> future;
@@ -926,7 +957,7 @@ public final class DnssecValidator {
          * <em>one</em> key. The RRset becomes trusted only once an {@code RRSIG} <em>made by that key</em> has
          * validated over the whole of it, which is what lets the rest of the set be trusted with it. Offering the
          * verifier only the matched keys is what enforces that: an {@code RRSIG} made by any other key in the
-         * response has no candidate to verify against.</p>
+         * response has no candidate to verify against.
          */
         private final class DnskeyListener extends FetchListener {
 
@@ -1078,8 +1109,17 @@ public final class DnssecValidator {
                 }
                 DnssecVerificationResult verification = verifier.verify(dsSet, signingKeys, budget);
                 if (!verification.isSecure()) {
-                    complete(verification.reason(), "the DS RRset of " + child + " did not validate against the "
-                            + "keys of " + signingZone + ": " + verification.message());
+                    complete(notADowngrade(verification.reason()), "the DS RRset of " + child + " did not validate "
+                            + "against the keys of " + signingZone + ": " + verification.message());
+                    return;
+                }
+                if (verification.isWildcardExpanded()) {
+                    // RFC 4592, Section 4.2 says a wildcard never synthesises a delegation, so there is no
+                    // legitimate reading of this at all; and the signature would authenticate the same RDATA under
+                    // any child name, which is the whole delegation handed over.
+                    complete(DnssecFailureReason.DNSSEC_BOGUS, "the DS RRset offered for " + child + " is covered "
+                            + "by a signature over the wildcard " + verification.signedOwner() + " rather than "
+                            + "over " + child + ", so it delegates nothing");
                     return;
                 }
                 List<DnsDsRecord> dsRecords = asDs(dsSet);
@@ -1106,9 +1146,6 @@ public final class DnssecValidator {
                 establishKeys(child, null, usable);
             }
         }
-
-        // -------------------------------------------------------------------------------------------------------
-        // Small helpers
 
         /**
          * Returns the keys a trust anchor vouches for. An anchor names one key by tag, algorithm and digest, and
@@ -1159,12 +1196,12 @@ public final class DnssecValidator {
          * content is "the queried name is covered by the denial chain, and its closest encloser is the one
          * claimed". The closest encloser is not known here, so each ancestor from the parent up to the zone is
          * offered in turn, which is bounded by the label count of a name and hence by
-         * {@link DnssecLimits#maxDelegationDepth()}.</p>
+         * {@link DnssecLimits#maxDelegationDepth()}.
          *
          * <p>This cannot be turned into a way of hiding a real delegation. A delegation exists, so the zone's
          * denial chain has a record matching it, and both denial forms refuse to call a name absent when
          * something matches it. Forging one is not available either: the records were verified before they got
-         * here.</p>
+         * here.
          *
          * @return the verdict, or {@code null} if no ancestor could even be tried.
          */
@@ -1336,9 +1373,6 @@ public final class DnssecValidator {
             return names;
         }
 
-        // -------------------------------------------------------------------------------------------------------
-        // Lifecycle
-
         private void armTimeout() {
             long remaining = budget.remainingMillis();
             if (remaining <= 0) {
@@ -1357,6 +1391,14 @@ public final class DnssecValidator {
                 traceNoBackstop();
             } catch (RejectedExecutionException e) {
                 traceNoBackstop();
+            }
+        }
+
+        private void cancelTimeout() {
+            ScheduledFuture<?> task = timeoutTask;
+            if (task != null) {
+                timeoutTask = null;
+                task.cancel(false);
             }
         }
 
@@ -1412,10 +1454,7 @@ public final class DnssecValidator {
                 return;
             }
             finished = true;
-            if (timeoutTask != null) {
-                timeoutTask.cancel(false);
-                timeoutTask = null;
-            }
+            cancelTimeout();
             trace(reason.impliedStatus() + ": " + message);
             releaseRetained();
             promise.trySuccess(new DnssecValidationResult(reason, message, signer, insecureAt, cause,
@@ -1423,16 +1462,57 @@ public final class DnssecValidator {
         }
     }
 
+    /**
+     * The reason to report for an exception that escaped to a catch block instead of being handled where it was
+     * raised.
+     *
+     * <p>Every route out of here is a Bogus one, {@link #notADowngrade} included. An escaped exception is a
+     * failure to evaluate on a path that was not expected to fail at all, and an exception handler that
+     * downgrades is one an attacker only has to make throw. In particular a
+     * {@link DnssecUnsupportedAlgorithmException} does not become
+     * {@link DnssecFailureReason#UNSUPPORTED_DNSKEY_ALGORITHM} here: the zone-level judgement that legitimately
+     * reaches Insecure is made in {@link DnssecSignatureVerifier}, which has the zone's whole key set to make it
+     * with, and by {@link DnssecDenialOfExistence}, which reaches it through a proof.
+     */
     private static DnssecFailureReason reasonOf(DnssecException e) {
-        if (e instanceof DnssecCanonicalizationException) {
-            return ((DnssecCanonicalizationException) e).reason();
-        }
         if (e instanceof DnssecLimitExceededException) {
             return DnssecFailureReason.LIMIT_EXCEEDED;
         }
-        if (e instanceof DnssecUnsupportedAlgorithmException) {
-            return DnssecFailureReason.UNSUPPORTED_DNSKEY_ALGORITHM;
+        if (e instanceof DnssecCanonicalizationException) {
+            return notADowngrade(((DnssecCanonicalizationException) e).reason());
         }
         return DnssecFailureReason.DNSSEC_BOGUS;
+    }
+
+    /**
+     * Replaces a reason implying {@link DnssecStatus#INSECURE} with {@link DnssecFailureReason#DNSSEC_BOGUS}.
+     *
+     * <p>Applied wherever a failure to <em>evaluate</em> must not become a verdict of <em>unsigned</em>: material
+     * that sits inside a zone the chain of trust has already established, and the reason reported for an escaped
+     * exception. Inside a provably signed zone an Insecure reason is not a licence to treat the data as unsigned —
+     * the delegation is secure, so an RRset that does not validate against the zone's keys is Bogus — and anything
+     * else would let whoever can make one RRset unevaluatable strip DNSSEC from the zone it sits in.
+     */
+    private static DnssecFailureReason notADowngrade(DnssecFailureReason reason) {
+        return reason.impliedStatus() == DnssecStatus.INSECURE ? DnssecFailureReason.DNSSEC_BOGUS : reason;
+    }
+
+    /**
+     * Returns {@code true} if a verification authenticated the owner name the record arrived under rather than a
+     * wildcard above it.
+     *
+     * <p><a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-5.4">RFC 4035, Section 5.4</a>: a record
+     * proves that wildcard expansion could not have been used only when its owner name has as many labels as the
+     * Labels field of the {@code RRSIG} covering it. Below that the signature covers {@code *.} followed by the
+     * tail of the owner name, so the same record and the same signature verify under <em>any</em> owner name
+     * inside the zone. That is what a wildcard is for in an answer, which is why an answer is instead required to
+     * come with a denial of existence for the queried name. Everywhere else the owner name <em>is</em> the
+     * meaning: a denial of existence would have its {@code matches()} and {@code covers()} read a name the zone
+     * never signed, and a {@code DS} would delegate a name
+     * <a href="https://www.rfc-editor.org/rfc/rfc4592.html#section-4.2">RFC 4592, Section 4.2</a> says a wildcard
+     * never synthesises.
+     */
+    private static boolean authenticatesItsOwnerName(DnssecVerificationResult result) {
+        return result.isSecure() && !result.isWildcardExpanded();
     }
 }

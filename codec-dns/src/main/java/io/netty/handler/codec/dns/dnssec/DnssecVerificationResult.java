@@ -24,14 +24,14 @@ import io.netty.util.internal.ObjectUtil;
  * <p>This is a verdict about a single RRset and its {@code RRSIG}s, not about a whole answer. It says nothing about
  * whether the key that validated the signature is itself trusted, whether the records are in bailiwick, or whether
  * a wildcard answer came with the denial-of-existence proof it needs. Those belong to the chain of trust, which
- * builds on this.</p>
+ * builds on this.
  *
  * <p>{@link #status()} is derived from {@link #reason()} through {@link DnssecFailureReason#impliedStatus()}, so
  * the two can never disagree. The distinction that matters is between {@link DnssecStatus#BOGUS} and
  * {@link DnssecStatus#INSECURE}: <em>Bogus</em> means the verifier holds proof that the answer is inconsistent with
  * what the zone signed, and <em>Insecure</em> means it could not evaluate the material at all, which
  * <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-5.2">RFC 4035, Section 5.2</a> treats as unsigned.
- * Conflating them in either direction is how half-validators become bypasses.</p>
+ * Conflating them in either direction is how half-validators become bypasses.
  */
 public final class DnssecVerificationResult {
 
@@ -69,7 +69,7 @@ public final class DnssecVerificationResult {
      * {@link #status()} is {@link DnssecStatus#SECURE}.
      *
      * <p>"Secure" here is relative to the keys that were offered. Whether those keys are the zone's real keys is a
-     * question about the chain of trust and is answered elsewhere.</p>
+     * question about the chain of trust and is answered elsewhere.
      */
     public boolean isSecure() {
         return reason == DnssecFailureReason.NONE;
@@ -106,7 +106,7 @@ public final class DnssecVerificationResult {
      * valid {@code RRSIG} is sufficient, so this is the first one that verified and the others were not examined.
      * That is not only permitted but wanted; BIND's
      * <a href="https://www.cve.org/CVERecord?id=CVE-2026-11605">CVE-2026-11605</a> came of continuing to verify
-     * signatures after one had already succeeded.</p>
+     * signatures after one had already succeeded.
      */
     public DnsRrsigRecord signature() {
         return signature;
@@ -124,7 +124,7 @@ public final class DnssecVerificationResult {
      * Returns the owner name the signature was actually computed over, or {@code null} if verification failed.
      *
      * <p>This is the RRset's own owner name for an ordinary answer, and the wildcard name {@code *.} followed by
-     * the rightmost {@code RRSIG} Labels labels when {@link #isWildcardExpanded()} is {@code true}.</p>
+     * the rightmost {@code RRSIG} Labels labels when {@link #isWildcardExpanded()} is {@code true}.
      */
     public DnsName signedOwner() {
         return signedOwner;
@@ -137,7 +137,7 @@ public final class DnssecVerificationResult {
      * <p><strong>A caller must not treat such an answer as authentic on this result alone.</strong> RFC 4035,
      * Section 5.3.4 requires it to additionally obtain an authenticated denial of existence for the queried name:
      * without it, a valid wildcard signature can be replayed over a name the zone answers explicitly, which is a
-     * substitution of one answer for another rather than a forgery of either.</p>
+     * substitution of one answer for another rather than a forgery of either.
      */
     public boolean isWildcardExpanded() {
         return wildcardExpanded;

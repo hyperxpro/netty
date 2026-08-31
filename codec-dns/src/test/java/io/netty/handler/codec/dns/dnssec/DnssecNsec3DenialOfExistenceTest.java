@@ -41,14 +41,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Every owner name here is a label RFC 5155 publishes, and every hash a proof has to compute for itself is one
  * the appendix names in a comment. {@link DnsNsec3HasherTest} checks that this implementation reproduces them, so
- * a failure here is a failure of the proof logic and not of the hash.</p>
+ * a failure here is a failure of the proof logic and not of the hash.
  *
  * <p>The example zone sets the Opt-Out flag on every {@code NSEC3} record. That is why most of these responses are
  * {@link DnssecStatus#INSECURE} rather than {@link DnssecStatus#SECURE}: RFC 5155, section 9.2 forbids the
  * {@code AD} bit on a response whose closest encloser proof has an opt-out record covering the "next closer" name,
  * because a name in that span may still exist as an insecure delegation. The answer is still returned, it is
  * simply not authenticated. Where a test needs the authenticated outcome it repeats the same records with the flag
- * clear.</p>
+ * clear.
  */
 public class DnssecNsec3DenialOfExistenceTest {
 
@@ -346,26 +346,44 @@ public class DnssecNsec3DenialOfExistenceTest {
     }
 
     /**
-     * RFC 9276, section 3.2 asks for two thresholds. Between them the answer is returned unauthenticated; above
-     * the higher one it is rejected outright, so that the unauthenticated band stays too narrow to be a general
-     * way of switching validation off for a zone.
+     * RFC 9276, section 3.2 permits either an insecure answer or a rejection above a threshold, and section 4 says
+     * the two points SHOULD be the same, because a count that falls between them leaves the zone open to an
+     * attacker in the middle as if it were unsigned. The defaults put both at 50, so there is no such band; the
+     * two-threshold form is still reachable for an operator who configures it, and is exercised here to show the
+     * softer verdict is not dead code.
      *
-     * <p>Neither verdict needs a single hash to be computed, which is the point: the iteration count is checked
-     * before the work it asks for is done.</p>
+     * <p>No verdict needs a single hash to be computed, which is the point: the iteration count is checked before
+     * the work it asks for is done.
      */
     @Test
     public void testIterationCountPolicy() {
+        // With the defaults the two points coincide, so anything above 50 is rejected outright and there is no
+        // band in which a signed zone would be handed back unauthenticated.
         DnssecBudget budget = new DnssecBudget(DnssecLimits.defaults(), DnssecClock.SYSTEM);
         DnssecDenialOfExistence evaluator = new DnssecDenialOfExistence(EXAMPLE, budget);
+        List<DnsRecord> aboveDefault = records(nsec3(H_EXAMPLE + ".example.",
+                DnsNsec3Hasher.HASH_ALGORITHM_SHA1, OPT_OUT, 51, SALT, hash(H_NS1), MX, RRSIG));
+        DnssecDenialOfExistence.Result rejected = evaluator.proveNameError(name("a.c.x.w.example."), aboveDefault);
+        assertEquals(DnssecStatus.BOGUS, rejected.status());
+        assertEquals(DnssecFailureReason.LIMIT_EXCEEDED, rejected.reason());
+
+        // An operator who deliberately separates the two points gets the softer verdict in between. RFC 9276,
+        // section 4 advises against this shape; the mechanism is tested so it cannot rot unnoticed.
+        DnssecLimits banded = DnssecLimits.newBuilder()
+                .maxNsec3Iterations(100)
+                .maxNsec3IterationsHardFail(500)
+                .build();
+        DnssecDenialOfExistence banular =
+                new DnssecDenialOfExistence(EXAMPLE, new DnssecBudget(banded, DnssecClock.SYSTEM));
         List<DnsRecord> tooMany = records(nsec3(H_EXAMPLE + ".example.",
                 DnsNsec3Hasher.HASH_ALGORITHM_SHA1, OPT_OUT, 101, SALT, hash(H_NS1), MX, RRSIG));
-        DnssecDenialOfExistence.Result insecure = evaluator.proveNameError(name("a.c.x.w.example."), tooMany);
+        DnssecDenialOfExistence.Result insecure = banular.proveNameError(name("a.c.x.w.example."), tooMany);
         assertEquals(DnssecStatus.INSECURE, insecure.status());
         assertEquals(DnssecFailureReason.NSEC3_ITERATIONS_TOO_HIGH, insecure.reason());
 
         List<DnsRecord> farTooMany = records(nsec3(H_EXAMPLE + ".example.",
                 DnsNsec3Hasher.HASH_ALGORITHM_SHA1, OPT_OUT, 501, SALT, hash(H_NS1), MX, RRSIG));
-        DnssecDenialOfExistence.Result bogus = evaluator.proveNameError(name("a.c.x.w.example."), farTooMany);
+        DnssecDenialOfExistence.Result bogus = banular.proveNameError(name("a.c.x.w.example."), farTooMany);
         assertEquals(DnssecStatus.BOGUS, bogus.status());
         assertEquals(DnssecFailureReason.LIMIT_EXCEEDED, bogus.reason());
         assertEquals(0, budget.nsec3HashComputations());

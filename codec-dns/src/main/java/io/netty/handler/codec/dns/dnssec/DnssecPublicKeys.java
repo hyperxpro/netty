@@ -40,22 +40,18 @@ import java.util.Arrays;
  * <p>The Public Key field is the trailing, variable-length part of the {@code DNSKEY} RDATA described by
  * <a href="https://www.rfc-editor.org/rfc/rfc4034.html#section-2.1">RFC 4034, Section 2.1</a>; its interpretation is
  * entirely determined by the Algorithm field, and each algorithm family has its own encoding RFC. Only the key field
- * itself is passed here, not the four-octet {@code flags || protocol || algorithm} header.</p>
- *
- * <h3>Why this class validates keys itself</h3>
+ * itself is passed here, not the four-octet {@code flags || protocol || algorithm} header.
  *
  * <p>A {@code DNSKEY} arrives from the network and is attacker-controlled, so every structural rule its RFC states is
  * enforced here rather than left to a JCA provider. That is not belt-and-braces: {@code KeyFactory}'s {@code EC}
  * implementation in the JDK accepts an {@link ECPublicKeySpec} whose point is <em>not on the curve</em>, so an
- * on-curve check performed here is the only one that happens.</p>
- *
- * <h3>Canonicality is a security property, not tidiness</h3>
+ * on-curve check performed here is the only one that happens.
  *
  * <p>Several rules enforced here reject keys that are arithmetically fine but encoded in more than one way. They
  * exist because <strong>a key with two wire encodings has two key tags and two {@code DS} digests</strong>, and key
  * tag collisions are the amplification primitive behind
  * <a href="https://nvd.nist.gov/vuln/detail/CVE-2023-50387">CVE-2023-50387</a> ("KeyTrap") - see
- * {@link DnssecKeyTag}. Letting an attacker mint them at will is the thing to prevent.</p>
+ * {@link DnssecKeyTag}. Letting an attacker mint them at will is the thing to prevent.
  *
  * <p>The elliptic-curve range check is the least obvious of these, and it is not merely a bounds test. On both
  * curves used by DNSSEC, {@code b} is a quadratic residue modulo {@code p}, so {@code x == 0} is a real curve
@@ -63,11 +59,9 @@ import java.util.Arrays;
  * satisfies it identically: without the requirement that each coordinate be strictly less than {@code p}, one key
  * would have two valid encodings. The JDK does not help here either, as {@code KeyFactory} accepts {@code x == p}.
  * The RSA rules of <a href="https://www.rfc-editor.org/rfc/rfc3110.html#section-2">RFC 3110, Section 2</a> - no
- * leading zero octets, and the 3-octet exponent length reserved for lengths above 255 - are the same defence.</p>
+ * leading zero octets, and the 3-octet exponent length reserved for lengths above 255 - are the same defence.
  *
- * <h3>Malformed versus unusable</h3>
- *
- * <p>The two failures this class raises are not interchangeable, because they lead to opposite verdicts:</p>
+ * <p>The two failures this class raises are not interchangeable, because they lead to opposite verdicts:
  * <ul>
  *   <li>{@link DnssecMalformedDataException} means the key breaks a rule its encoding RFC states. That is proof
  *   the data is wrong, and a validator may treat it as <em>Bogus</em>.</li>
@@ -88,7 +82,7 @@ public final class DnssecPublicKeys {
      * {@code RSASHA256} keys as small as 512 bits, and the example key in
      * <a href="https://www.rfc-editor.org/rfc/rfc5702.html#section-6.1">RFC 5702, Section 6.1</a> is exactly that
      * size, but 512-bit RSA has been factorable on commodity hardware for many years. Callers that must accept such
-     * keys can pass a lower bound explicitly to {@link #decode(DnssecAlgorithm, byte[], int)}.</p>
+     * keys can pass a lower bound explicitly to {@link #decode(DnssecAlgorithm, byte[], int)}.
      */
     public static final int DEFAULT_MINIMUM_RSA_MODULUS_BITS = 1024;
 
@@ -397,12 +391,12 @@ public final class DnssecPublicKeys {
      * case. {@code InvalidKeySpecException} is reachable with an RSA key that RFC 3110, Section 2 permits but
      * {@code SunRsaSign} refuses: an exponent that is not smaller than the modulus, or an exponent longer than 64
      * bits once the modulus exceeds 3072 bits. RFC 3110 allows exponents up to 4096 bits, so such a key is legal
-     * and simply unusable here.</p>
+     * and simply unusable here.
      *
      * <p>The provider's own diagnostic is preserved as the cause, and the message names the algorithm, so a caller
      * can log this at warning level with enough detail for an operator to see which key was skipped and why. It is
      * deliberately not logged here: {@code decode} runs once per {@code DNSKEY} on attacker-supplied input, and a
-     * log statement on that path is a flooding vector.</p>
+     * log statement on that path is a flooding vector.
      */
     private static PublicKey generate(DnssecAlgorithm algorithm, KeySpec keySpec) {
         try {

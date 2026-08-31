@@ -30,13 +30,11 @@ import java.util.Map;
  *
  * <p>Deliberately not an {@code enum}: an algorithm number this implementation has never heard of must still flow
  * through the stack so that a validator can report the zone as <em>Insecure</em> rather than fail. {@link
- * #valueOf(int)} therefore returns an unregistered, unsupported instance for such numbers instead of throwing.</p>
- *
- * <h3>Which algorithms are supported</h3>
+ * #valueOf(int)} therefore returns an unregistered, unsupported instance for such numbers instead of throwing.
  *
  * <p><a href="https://www.rfc-editor.org/rfc/rfc9904.html">RFC 9904</a> obsoleted RFC 8624 and moved the
  * requirement levels into the registry itself. The algorithms marked {@code MUST} or {@code RECOMMENDED} in the
- * "Implement for DNSSEC Validation" column of RFC 9904, Table 2 are implemented here:</p>
+ * "Implement for DNSSEC Validation" column of RFC 9904, Table 2 are implemented here:
  *
  * <table border="1">
  * <caption>Implement for DNSSEC Validation</caption>
@@ -61,16 +59,16 @@ import java.util.Map;
  *
  * <p>Algorithm 12 (ECC-GOST) is listed as {@code MAY} by RFC 9904, Table 2, but
  * <a href="https://www.rfc-editor.org/rfc/rfc9906.html#section-2">RFC 9906, Section 2</a> subsequently retired it and
- * IANA now records it as {@code MUST NOT} in every column.</p>
+ * IANA now records it as {@code MUST NOT} in every column.
  *
  * <p>Algorithms 253 and 254 are private-use. They carry no interoperable meaning, and
  * <a href="https://www.rfc-editor.org/rfc/rfc6840.html#section-5.3">RFC 6840, Section 5.3</a> explicitly permits a
  * validator that supports no private algorithm to treat such a zone as unsigned, so they are reported as
- * unsupported.</p>
+ * unsupported.
  *
  * <p>{@link #isSupported()} is stricter than "listed above": it also requires the running JDK to offer the algorithm.
  * {@code Ed25519} and {@code Ed448} were only added to the JDK in Java 15, so on an older runtime
- * {@link #ED25519} and {@link #ED448} report {@code false}.</p>
+ * {@link #ED25519} and {@link #ED448} report {@code false}.
  */
 public final class DnssecAlgorithm implements Comparable<DnssecAlgorithm> {
 
@@ -222,7 +220,7 @@ public final class DnssecAlgorithm implements Comparable<DnssecAlgorithm> {
      *
      * <p>Unlike {@link #valueOf(String)} this never throws: an unassigned or unrecognised number yields an
      * unregistered instance whose {@link #name()} is {@code "UNKNOWN"} and whose {@link #isSupported()} is
-     * {@code false}, so that an unknown algorithm can be reported rather than aborting the parse.</p>
+     * {@code false}, so that an unknown algorithm can be reported rather than aborting the parse.
      *
      * @param intValue the 8-bit algorithm number as it appears on the wire.
      * @return the matching instance, never {@code null}.
@@ -310,7 +308,7 @@ public final class DnssecAlgorithm implements Comparable<DnssecAlgorithm> {
      *
      * <p>Both halves matter. An algorithm can be {@code RECOMMENDED} by RFC 9904 and still be unavailable, most
      * commonly {@link #ED25519} and {@link #ED448} on a JDK older than 15. A validator that finds every algorithm of
-     * a zone unsupported must treat that zone as <em>Insecure</em>, not <em>Bogus</em>.</p>
+     * a zone unsupported must treat that zone as <em>Insecure</em>, not <em>Bogus</em>.
      */
     public boolean isSupported() {
         return supported;
@@ -321,7 +319,7 @@ public final class DnssecAlgorithm implements Comparable<DnssecAlgorithm> {
      * <a href="https://www.rfc-editor.org/rfc/rfc3110.html#section-2">RFC 3110, Section 2</a>.
      *
      * <p>The family is a statement about the key encoding only and is independent of {@link #isSupported()}:
-     * {@link #RSAMD5} is in the RSA family yet must never be used.</p>
+     * {@link #RSAMD5} is in the RSA family yet must never be used.
      */
     public boolean isRsa() {
         return family == FAMILY_RSA;
@@ -350,7 +348,7 @@ public final class DnssecAlgorithm implements Comparable<DnssecAlgorithm> {
      * <p>A non-{@code null} result does not imply the running JDK offers it; check {@link #isSupported()} for that.
      * For {@link #ECDSAP256SHA256} and {@link #ECDSAP384SHA384} the returned name expects an ASN.1 DER signature, so
      * the wire format must first be converted with
-     * {@link DnssecSignatures#toDer(byte[], int)}.</p>
+     * {@link DnssecSignatures#toDer(byte[], int)}.
      */
     public String signatureAlgorithm() {
         return signatureAlgorithm;

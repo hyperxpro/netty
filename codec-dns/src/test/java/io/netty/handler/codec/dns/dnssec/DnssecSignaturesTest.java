@@ -174,7 +174,7 @@ public class DnssecSignaturesTest {
      * octet with its top bit set. SunEC's parser accepts a negative INTEGER and verifies it anyway, so an encoder
      * that omits sign padding ships broken output that every verify-based test calls correct, until a strict
      * verifier such as BouncyCastle, or a future tightening of the JDK, rejects it. {@link #assertStrictDer} is
-     * what actually holds the encoding to the specification, and removing it silently guts this test.</p>
+     * what actually holds the encoding to the specification, and removing it silently guts this test.
      */
     @Test
     public void testToDerRoundTripsAgainstP1363() throws Exception {

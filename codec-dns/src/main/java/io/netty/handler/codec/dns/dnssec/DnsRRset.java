@@ -35,36 +35,32 @@ import java.util.List;
  * see <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-5.3">RFC 4035, Section 5.3</a>. Grouping a
  * section into RRsets is consequently the first thing a validator does, and it is not merely bookkeeping: a
  * signature is computed over <em>all</em> the members of the set, so a validator that silently loses one, or that
- * merges two sets that the zone signed separately, gets a different preimage and a wrong answer.</p>
- *
- * <h3>Duplicate elimination, and the trap in it</h3>
+ * merges two sets that the zone signed separately, gets a different preimage and a wrong answer.
  *
  * <p><a href="https://www.rfc-editor.org/rfc/rfc4034.html#section-6.3">RFC 4034, Section 6.3</a> requires duplicate
  * records to be removed before the canonical form of the RRset is computed, since a repeated record would be fed
  * into the signature twice. This class does that, comparing the {@code RDATA} octets with
- * {@link ByteBufUtil#equals(io.netty.buffer.ByteBuf, io.netty.buffer.ByteBuf)}.</p>
+ * {@link ByteBufUtil#equals(io.netty.buffer.ByteBuf, io.netty.buffer.ByteBuf)}.
  *
  * <p>It has to be done that way. {@code equals} and {@code hashCode} on these records come from
  * {@link io.netty.handler.codec.dns.AbstractDnsRecord}, which compares the name, type, class and TTL and
  * <strong>not</strong> the {@code RDATA} — so every member of an RRset is {@code equals} to every other member by
  * construction. Removing duplicates by putting the records in a {@link java.util.Set}, or with
  * {@code List.contains}, therefore collapses a five-key {@code DNSKEY} RRset to one key, and the RRset then fails
- * to validate against its own signature. Nothing about that failure points at the cause.</p>
- *
- * <h3>What is deliberately not checked here</h3>
+ * to validate against its own signature. Nothing about that failure points at the cause.
  *
  * <p>The constructor does not verify that every record really does share the owner name, class and type it is
  * filed under. {@link #group(DnsMessage, DnsSection, DnssecLimits)} cannot produce a mixed set, because those three
  * fields are its grouping key, but a hand-assembled one can be mixed, and
  * {@link DnssecSignatureVerifier} checks for that as a validation rule rather than an argument error: a mixed set
  * arriving from the network has to become {@link DnssecStatus#BOGUS}, which an {@link IllegalArgumentException}
- * thrown from a constructor is not.</p>
+ * thrown from a constructor is not.
  *
  * <p>Neither this class nor {@link #group(DnsMessage, DnsSection, DnssecLimits)} retains or releases any record.
- * The records belong to the message they were decoded from and stay valid for as long as it does.</p>
+ * The records belong to the message they were decoded from and stay valid for as long as it does.
  *
  * <p>Instances are immutable, in the sense that the lists cannot be changed after construction; the records they
- * hold are reference-counted objects owned by someone else.</p>
+ * hold are reference-counted objects owned by someone else.
  */
 public final class DnsRRset {
 
@@ -112,12 +108,12 @@ public final class DnsRRset {
      * Type Covered field, matched on owner name, class and covered type; one that covers a type with no records in
      * the section is dropped, because there is nothing there for it to authenticate. {@code OPT} is skipped
      * entirely: <a href="https://www.rfc-editor.org/rfc/rfc6891.html#section-6.1.1">RFC 6891, Section 6.1.1</a>
-     * makes it a per-message pseudo-record that belongs to no zone and is never signed.</p>
+     * makes it a per-message pseudo-record that belongs to no zone and is never signed.
      *
      * <p>Only {@link DnsSection#ANSWER} and {@link DnsSection#AUTHORITY} should be fed to a validator.
      * {@link DnsSection#ADDITIONAL} is not authenticated data: treating it as though it were is the shape of
      * <a href="https://www.cve.org/CVERecord?id=CVE-2025-11411">CVE-2025-11411</a>, where records promiscuously
-     * added to a response were allowed to influence the outcome.</p>
+     * added to a response were allowed to influence the outcome.
      *
      * @param message the message to read. Not modified, not retained.
      * @param section the section to group.
@@ -188,7 +184,7 @@ public final class DnsRRset {
      * Returns the owner name every record in this set has, in wire form.
      *
      * <p>This is the name signature verification uses, downcased and, where the {@code RRSIG} says the answer came
-     * from a wildcard, replaced by the wildcard name. It is never derived from {@link DnsRecord#name()}.</p>
+     * from a wildcard, replaced by the wildcard name. It is never derived from {@link DnsRecord#name()}.
      */
     public DnsName owner() {
         return owner;
@@ -214,7 +210,7 @@ public final class DnsRRset {
      * <p>This is <em>not</em> the order they are signed in: RFC 4034, Section 6.3 sorts an RRset by the
      * {@code RDATA} of its canonical form, which {@link DnssecCanonicalizer} does while it builds the signed data.
      * Sorting is left there rather than done here because canonicalising {@code RDATA} can fail, and grouping a
-     * message must not: one unusable record would otherwise take the whole section with it.</p>
+     * message must not: one unusable record would otherwise take the whole section with it.
      *
      * @return an unmodifiable list, never {@code null}.
      */
@@ -282,7 +278,7 @@ public final class DnsRRset {
      * <p>Quadratic on purpose. The number of records is bounded by
      * {@link DnssecLimits#maxRecordsPerSection()} and the total {@code RDATA} of a message is bounded by the
      * message itself, so the octets compared are bounded by that product and there is nothing here for an attacker
-     * to inflate. A hash-based index would trade that for a collision the same attacker chooses.</p>
+     * to inflate. A hash-based index would trade that for a collision the same attacker chooses.
      */
     private static List<DnssecRecord> deduplicate(List<? extends DnssecRecord> records) {
         List<DnssecRecord> unique = new ArrayList<DnssecRecord>(records.size());

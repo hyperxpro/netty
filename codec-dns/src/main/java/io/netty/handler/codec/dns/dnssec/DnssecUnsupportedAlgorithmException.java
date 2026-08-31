@@ -23,19 +23,19 @@ package io.netty.handler.codec.dns.dnssec;
  * <p>The last case is real rather than theoretical: {@code SunRsaSign} refuses an RSA exponent that is not smaller
  * than the modulus, and refuses an exponent longer than 64 bits once the modulus exceeds 3072 bits, while
  * <a href="https://www.rfc-editor.org/rfc/rfc3110.html#section-2">RFC 3110, Section 2</a> permits exponents of up
- * to 4096 bits. Such a key is legal and simply unusable here.</p>
+ * to 4096 bits. Such a key is legal and simply unusable here.
  *
  * <p>This is <em>not</em> a data error, and the distinction matters: <em>Bogus</em> should mean the validator holds
  * proof of an inconsistency, and a limitation of the local runtime is no such proof. A validator that cannot
  * evaluate any of the algorithms offered by a zone must treat that zone as <em>Insecure</em> rather than
  * <em>Bogus</em>, per
  * <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-5.2">RFC 4035, Section 5.2</a> and
- * <a href="https://www.rfc-editor.org/rfc/rfc6840.html#section-5.3">RFC 6840, Section 5.3</a>.</p>
+ * <a href="https://www.rfc-editor.org/rfc/rfc6840.html#section-5.3">RFC 6840, Section 5.3</a>.
  *
  * <p>Callers should surface this at warning level. It is not logged where it is raised, because that code runs once
  * per record on attacker-supplied input and an unbounded log statement there is a flooding vector; the message
  * names the algorithm and the provider's own diagnostic is kept as the cause, so a caller has everything an
- * operator needs to see which key was skipped and why.</p>
+ * operator needs to see which key was skipped and why.
  */
 public final class DnssecUnsupportedAlgorithmException extends DnssecException {
 

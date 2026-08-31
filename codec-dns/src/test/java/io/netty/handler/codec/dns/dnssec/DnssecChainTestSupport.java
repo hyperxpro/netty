@@ -50,10 +50,10 @@ import java.util.Map;
  * far enough, but its private keys are not published, so anything that needs a record the RFC does not contain —
  * a delegation into a second signed zone, a wildcard with its proof, an NSEC3 opt-out span — has to be signed
  * here. These zones use ECDSA P-256 (algorithm 13) because key generation and signing are both fast enough to do
- * inside a unit test, unlike the 1024-bit RSA of appendix A.</p>
+ * inside a unit test, unlike the 1024-bit RSA of appendix A.
  *
  * <p>Everything is written from the RFC text. Nothing here is derived from another implementation's code or test
- * data.</p>
+ * data.
  */
 final class DnssecChainTestSupport {
 

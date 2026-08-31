@@ -25,19 +25,15 @@ import java.util.List;
  * What a {@link DnssecValidator} concluded about one response: the security state, why it reached it, and the
  * chain of reasoning that got it there.
  *
- * <h3>It holds no buffers</h3>
- *
  * <p>Nothing here is reference-counted and nothing here points into the response that was validated. Everything the
  * validator retained is released before this object is published, so it may be logged, cached, put on a queue or
  * handed to another thread without any further thought about lifetimes. That is also why it does not carry the
  * validated RRsets: doing so would make the result own the answer's buffers, and the caller would have to release
- * a verdict.</p>
- *
- * <h3>Reading the verdict</h3>
+ * a verdict.
  *
  * <p>{@link #status()} is {@link DnssecFailureReason#impliedStatus()} of {@link #reason()}, so the two can never
  * disagree. Only {@link DnssecStatus#SECURE} means the data may be relied on. The three failure states are not
- * interchangeable:</p>
+ * interchangeable:
  * <ul>
  *   <li>{@link DnssecStatus#INSECURE} is a <em>proof</em> that the data is unsigned — an authenticated denial of
  *   the {@code DS} RRset at a delegation, an opt-out span, or a delegation whose {@code DS} records name only
@@ -50,12 +46,10 @@ import java.util.List;
  *   not a licence to use the data.</li>
  * </ul>
  *
- * <h3>The trace</h3>
- *
  * <p>{@link #trace()} is the human-readable record of the walk — the zones whose keys were established, the
  * delegations followed, the RRsets verified, and the step that ended it. It is what {@code delv} prints, and it is
  * the difference between "Bogus" and an operator being able to act on "Bogus". It is diagnostic output: its
- * contents are not part of the API contract and must not be parsed.</p>
+ * contents are not part of the API contract and must not be parsed.
  */
 public final class DnssecValidationResult {
 
@@ -114,7 +108,7 @@ public final class DnssecValidationResult {
      *
      * <p>This is the zone the chain walk arrived at, not the Signer's Name an {@code RRSIG} claimed. The two agree
      * whenever the answer is Secure, precisely because the walk decides which keys are offered to the verifier and
-     * the verifier only considers an {@code RRSIG} whose Signer's Name is the owner of one of them.</p>
+     * the verifier only considers an {@code RRSIG} whose Signer's Name is the owner of one of them.
      */
     public DnsName signerName() {
         return signerName;
@@ -126,7 +120,7 @@ public final class DnssecValidationResult {
      * <p>Non-{@code null} exactly when {@link #status()} is {@link DnssecStatus#INSECURE} for a proven-unsigned
      * delegation: this is the child zone whose {@code DS} RRset was proven absent, was covered by an opt-out span,
      * or named only algorithms this build cannot evaluate. Everything at or below it is unsigned as far as this
-     * validator is concerned.</p>
+     * validator is concerned.
      */
     public DnsName insecureDelegation() {
         return insecureDelegation;
@@ -138,7 +132,7 @@ public final class DnssecValidationResult {
      * <p>Non-{@code null} for an {@link DnssecStatus#INDETERMINATE} caused by a
      * {@link DnssecRecordFetcher#fetch(DnsName, io.netty.handler.codec.dns.DnsRecordType) fetch} that failed, in
      * which case it is that fetch's cause. A validator never invents one: an absent cause means the verdict came
-     * from the data rather than from a broken lookup.</p>
+     * from the data rather than from a broken lookup.
      */
     public Throwable cause() {
         return cause;
@@ -157,7 +151,7 @@ public final class DnssecValidationResult {
      *
      * <p>One budget belongs to one {@code validate} call and is never reset by anything the response can provoke,
      * which is what Unbound's <a href="https://www.cve.org/CVERecord?id=CVE-2026-50045">CVE-2026-50045</a> got
-     * wrong. Reading the counters after the future has completed is safe: completing the future publishes them.</p>
+     * wrong. Reading the counters after the future has completed is safe: completing the future publishes them.
      */
     public DnssecBudget budget() {
         return budget;

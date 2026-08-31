@@ -94,6 +94,20 @@ public final class DnsDnskeyRecord extends AbstractDnssecRecord {
     }
 
     /**
+     * Reuses the fields already parsed from {@code record}: re-parsing a buffer a caller has read from would
+     * fail, and {@code duplicate()} shares this record's reference count, so releasing on that failure would
+     * free a buffer this record still holds.
+     */
+    private DnsDnskeyRecord(DnsDnskeyRecord record, ByteBuf content) {
+        super(record.name(), record.type(), record.dnsClass(), record.timeToLive(), record.owner(), content);
+        flags = record.flags;
+        protocol = record.protocol;
+        algorithm = record.algorithm;
+        publicKey = record.publicKey;
+        keyTag = record.keyTag;
+    }
+
+    /**
      * Returns the 16-bit Flags field. Bits other than {@link #FLAG_ZONE_KEY}, {@link #FLAG_SECURE_ENTRY_POINT} and
      * {@link #FLAG_REVOKE} are reserved and, per RFC 4034, section 2.1.1, must be ignored; they are reported here
      * unchanged because they are covered by any {@code RRSIG} over this record.
@@ -171,17 +185,17 @@ public final class DnsDnskeyRecord extends AbstractDnssecRecord {
 
     @Override
     public DnsDnskeyRecord copy() {
-        return replace(content().copy());
+        return new DnsDnskeyRecord(this, content().copy());
     }
 
     @Override
     public DnsDnskeyRecord duplicate() {
-        return replace(content().duplicate());
+        return new DnsDnskeyRecord(this, content().duplicate());
     }
 
     @Override
     public DnsDnskeyRecord retainedDuplicate() {
-        return replace(content().retainedDuplicate());
+        return new DnsDnskeyRecord(this, content().retainedDuplicate());
     }
 
     @Override

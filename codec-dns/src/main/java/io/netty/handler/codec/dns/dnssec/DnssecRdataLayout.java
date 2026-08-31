@@ -26,12 +26,10 @@ import io.netty.handler.codec.dns.DnsRecordType;
  * the octets its canonical form is built from would drift apart, the signed preimage would be wrong, and the only
  * symptom would be a spurious {@link DnssecStatus#BOGUS} on a zone that is signed correctly: silent, and
  * reproducible only against a real zone. That is why the table is written down once, here, rather than once in
- * each of them.</p>
- *
- * <h3>Two sets, not one</h3>
+ * each of them.
  *
  * <p>Membership is two independent questions, answered separately by {@link #isCompressible(DnsRecordType)} and
- * {@link #downcasesNames(DnsRecordType)}:</p>
+ * {@link #downcasesNames(DnsRecordType)}:
  * <ul>
  *   <li><strong>Compressible</strong> is <a href="https://www.rfc-editor.org/rfc/rfc3597.html#section-4">RFC 3597,
  *   section 4</a>: a receiver "MUST decompress domain names in RRs of well-known type", which the same section
@@ -51,7 +49,7 @@ import io.netty.handler.codec.dns.DnsRecordType;
  *   {@code TargetName} of {@code SVCB} or {@code HTTPS} and not {@code TLSA}, {@code SMIMEA} or {@code CAA}.</li>
  * </ul>
  *
- * <p>The asymmetries between the two are what a future editor will get wrong, so they are spelled out:</p>
+ * <p>The asymmetries between the two are what a future editor will get wrong, so they are spelled out:
  * <ul>
  *   <li>{@code RRSIG} is downcased but never decompressed:
  *   <a href="https://www.rfc-editor.org/rfc/rfc4034.html#section-3.1.7">RFC 4034, section 3.1.7</a> forbids
@@ -70,7 +68,7 @@ import io.netty.handler.codec.dns.DnsRecordType;
  * <p>A layout is shared by every type of the same shape, so membership cannot live on the shape alone: {@code MX},
  * {@code AFSDB} and {@code RT} are compressible while {@code KX}, laid out identically, is not. Each constant below
  * therefore carries its own membership, and {@link #downcasedOnly()} derives the non-compressible twin of a shape
- * from the compressible one so that the offsets themselves are still written down once.</p>
+ * from the compressible one so that the offsets themselves are still written down once.
  */
 final class DnssecRdataLayout {
 

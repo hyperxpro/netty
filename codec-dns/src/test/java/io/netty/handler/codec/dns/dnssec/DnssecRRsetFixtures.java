@@ -32,7 +32,7 @@ import java.util.Base64;
  * <p>The signatures in <a href="https://www.rfc-editor.org/rfc/rfc4035.html#appendix-A">RFC 4035, appendix A</a>
  * and its worked responses in appendix B are real: they verify cryptographically against the appendix A zone
  * signing key. That is what makes them usable as an end-to-end fixture rather than as an illustration, and it is
- * why the tests here can assert that a tampered record stops verifying.</p>
+ * why the tests here can assert that a tampered record stops verifying.
  */
 final class DnssecRRsetFixtures {
 
@@ -200,7 +200,7 @@ final class DnssecRRsetFixtures {
      * <p>A key tag is a 16-bit sum over the RDATA, so a collision is a search over two octets rather than a
      * cryptographic problem: that is what makes the LockCram shape of KeyTrap cheap to mount and worth bounding.
      * The modulus that comes out is not a real one, but it is well formed, which is what the tests need — they
-     * assert on the work the verifier does before and around the signature check.</p>
+     * assert on the work the verifier does before and around the signature check.
      */
     static DnsDnskeyRecord keyWithTag(DnsName owner, int tag, int distinguisher) {
         byte[] rdata = zoneSigningKeyRdata();

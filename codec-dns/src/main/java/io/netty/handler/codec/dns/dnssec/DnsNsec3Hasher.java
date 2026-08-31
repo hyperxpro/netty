@@ -28,7 +28,7 @@ import java.util.Map;
  * The iterated, salted hash of <a href="https://www.rfc-editor.org/rfc/rfc5155.html#section-5">RFC 5155,
  * section 5</a>, which is what turns an owner name into the label an {@code NSEC3} record is published under.
  *
- * <p>The function is</p>
+ * <p>The function is
  * <pre>
  * IH(salt, x, 0) = H(x || salt)
  * IH(salt, x, k) = H(IH(salt, x, k-1) || salt), if k &gt; 0
@@ -38,9 +38,7 @@ import java.util.Map;
  * The canonical form is the one of <a href="https://www.rfc-editor.org/rfc/rfc4034.html#section-6.2">RFC 4034,
  * section 6.2</a>: fully qualified, uncompressed, and with {@code A} to {@code Z} replaced by {@code a} to
  * {@code z}. A wildcard name keeps its literal {@code *} label, which falls out of doing nothing special with
- * it.</p>
- *
- * <h3>Cost, and why this class is stateful</h3>
+ * it.
  *
  * <p>A closest-encloser search walks from the query name up towards the zone apex, and every step of every proof
  * hashes another ancestor. The ancestors repeat, both between the searches a single response provokes and between
@@ -48,14 +46,14 @@ import java.util.Map;
  * keyed on the name and the parameters, and spends a {@link DnssecBudget#spendNsec3HashComputation()} only when it
  * has to do the work. Without that, the same ancestor is rehashed once per candidate and the quadratic
  * closest-encloser search of <a href="https://www.cve.org/CVERecord?id=CVE-2023-50868">CVE-2023-50868</a> costs
- * the attacker proportionally less for the same load on the validator.</p>
+ * the attacker proportionally less for the same load on the validator.
  *
  * <p>The budget is what bounds the cache: nothing is ever evicted, and nothing needs to be, because the number of
- * distinct entries can never exceed {@link DnssecLimits#maxNsec3HashComputations()}.</p>
+ * distinct entries can never exceed {@link DnssecLimits#maxNsec3HashComputations()}.
  *
  * <p>One instance belongs to one validation, on one thread, exactly like the {@link DnssecBudget} it is created
  * with. It is not thread-safe and must not be shared: the cache would under-count the budget and
- * {@link MessageDigest} is not safe to use from two threads at once.</p>
+ * {@link MessageDigest} is not safe to use from two threads at once.
  */
 public final class DnsNsec3Hasher {
 
@@ -93,7 +91,7 @@ public final class DnsNsec3Hasher {
      * {@code NSEC3} record with an unknown hash type to be <em>ignored</em> rather than to fail the response: a
      * zone in the middle of a hash algorithm rollover legitimately publishes records this validator cannot read
      * alongside records it can. It is only when ignoring them leaves nothing behind that the response is bogus,
-     * and that is a judgement for the proof, not for the hash function.</p>
+     * and that is a judgement for the proof, not for the hash function.
      */
     public static boolean isSupportedAlgorithm(int hashAlgorithm) {
         return hashAlgorithm == HASH_ALGORITHM_SHA1;
@@ -117,9 +115,9 @@ public final class DnsNsec3Hasher {
      * <p>Comparing owner names as text is not what this is for. A proof decodes the label and compares octets,
      * because <a href="https://www.rfc-editor.org/rfc/rfc5155.html#section-3.3">RFC 5155, section 3.3</a> makes the
      * label case-insensitive and a text comparison then has to get that right; the octets have no such
-     * problem.</p>
+     * problem.
      */
-    public static String toLabel(byte[] hash) {
+    static String toLabel(byte[] hash) {
         return Base32Hex.encode(ObjectUtil.checkNotNull(hash, "hash"));
     }
 
@@ -127,7 +125,7 @@ public final class DnsNsec3Hasher {
      * Returns {@code IH(salt, name, iterations)} for the canonical wire form of {@code name}.
      *
      * <p>The result is cached, so calling this again with the same arguments costs nothing and spends nothing. The
-     * returned array is owned by this hasher and must not be modified.</p>
+     * returned array is owned by this hasher and must not be modified.
      *
      * @param name          the owner name to hash, used in its canonical, down-cased wire form
      * @param hashAlgorithm the Hash Algorithm field of the {@code NSEC3} record
@@ -160,7 +158,7 @@ public final class DnsNsec3Hasher {
      * Returns how many distinct hashes this instance has computed, which is how many
      * {@link DnssecBudget#spendNsec3HashComputation()} it has spent.
      */
-    public int computedHashes() {
+    int computedHashes() {
         return cache.size();
     }
 

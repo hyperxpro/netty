@@ -31,7 +31,7 @@ import java.util.Map;
  * <p>Deliberately not an {@code enum}, for the same reason as {@link DnssecAlgorithm}: an unrecognised digest type
  * must be reportable rather than fatal. A {@code DS} RRset whose every digest type is unsupported makes the
  * delegation <em>Insecure</em>, per
- * <a href="https://www.rfc-editor.org/rfc/rfc6840.html#section-5.2">RFC 6840, Section 5.2</a>.</p>
+ * <a href="https://www.rfc-editor.org/rfc/rfc6840.html#section-5.2">RFC 6840, Section 5.2</a>.
  *
  * <table border="1">
  * <caption>Implement for DNSSEC Validation</caption>
@@ -47,11 +47,11 @@ import java.util.Map;
  *
  * <p>Digest type 3 is listed as {@code MAY} by RFC 9904, Table 3, but
  * <a href="https://www.rfc-editor.org/rfc/rfc9906.html#section-2">RFC 9906, Section 2</a> subsequently retired it and
- * IANA now records it as {@code MUST NOT} in every column.</p>
+ * IANA now records it as {@code MUST NOT} in every column.
  *
  * <p>Digest type 1 (SHA-1) remains {@code MUST} to <em>implement for validation</em> even though it is
  * {@code MUST NOT} to <em>use for delegation</em>: existing delegations still carry SHA-1 {@code DS} records and
- * refusing them would break resolution rather than improve it.</p>
+ * refusing them would break resolution rather than improve it.
  */
 public final class DnssecDigestType implements Comparable<DnssecDigestType> {
 
@@ -125,7 +125,7 @@ public final class DnssecDigestType implements Comparable<DnssecDigestType> {
      * Returns the {@link DnssecDigestType} for the given digest type number.
      *
      * <p>Never throws for an unassigned number: it yields an unregistered instance whose {@link #name()} is
-     * {@code "UNKNOWN"} and whose {@link #isSupported()} is {@code false}.</p>
+     * {@code "UNKNOWN"} and whose {@link #isSupported()} is {@code false}.
      *
      * @param intValue the 8-bit digest type as it appears on the wire.
      * @return the matching instance, never {@code null}.
@@ -220,7 +220,7 @@ public final class DnssecDigestType implements Comparable<DnssecDigestType> {
      * have, or {@code 0} if this package does not implement it.
      *
      * <p>The length is fixed by the digest algorithm, so a {@code DS} record whose Digest field is a different length
-     * is malformed and must be rejected before any comparison is attempted.</p>
+     * is malformed and must be rejected before any comparison is attempted.
      */
     public int digestLength() {
         return digestLength;

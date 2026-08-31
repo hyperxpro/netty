@@ -183,4 +183,45 @@ public class DnsNsecRecordTest {
             record.release();
         }
     }
+
+    /**
+     * {@code copy}, {@code duplicate} and {@code retainedDuplicate} must keep working once a caller has read from
+     * {@code content()}, the way they do on {@code DefaultDnsRawRecord}. Routing them through {@code replace},
+     * which re-parses, made them throw on a perfectly valid record, and because {@code duplicate()} shares this
+     * record's reference count the release-on-failure then freed a live record's buffer.
+     */
+    @Test
+    public void testCopyOfAConsumedRecordKeepsTheParsedFields() {
+        DnsNsecRecord record = newRecord(DnssecTestVectors.RFC4034_NSEC);
+        try {
+            ByteBuf content = record.content();
+            content.skipBytes(content.readableBytes());
+
+            DnsNsecRecord copy = record.copy();
+            try {
+                assertSame(DnsNsecRecord.class, copy.getClass());
+                assertEquals(record.nextDomainName(), copy.nextDomainName());
+                assertEquals(record.types(), copy.types());
+            } finally {
+                copy.release();
+            }
+            DnsNsecRecord duplicate = record.duplicate();
+            assertSame(DnsNsecRecord.class, duplicate.getClass());
+            assertEquals(record.nextDomainName(), duplicate.nextDomainName());
+            assertEquals(1, record.refCnt());
+            DnsNsecRecord retained = record.retainedDuplicate();
+            try {
+                assertSame(DnsNsecRecord.class, retained.getClass());
+                assertEquals(record.types(), retained.types());
+            } finally {
+                retained.release();
+            }
+
+            assertEquals(1, record.refCnt());
+            content.readerIndex(0);
+            assertArrayEquals(DnssecTestVectors.RFC4034_NSEC, ByteBufUtil.getBytes(content));
+        } finally {
+            record.release();
+        }
+    }
 }

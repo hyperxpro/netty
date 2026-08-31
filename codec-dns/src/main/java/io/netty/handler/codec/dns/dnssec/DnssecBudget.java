@@ -23,24 +23,22 @@ import io.netty.util.internal.ObjectUtil;
  * <p>A budget is created once, at the start of a validation, and spent as the validation proceeds. Each
  * {@code spendXxx()} method consumes one unit and throws {@link DnssecLimitExceededException} when there is none
  * left; the counter is not advanced in that case, so a counter never exceeds its limit and
- * {@link #signatureVerifications()} and friends can be asserted on exactly.</p>
+ * {@link #signatureVerifications()} and friends can be asserted on exactly.
  *
  * <p>Those read-only counters exist so that the bound can be tested for what it is. "The validation finished
  * quickly" is a statement about the machine it ran on; "the validation performed at most 32 signature
- * verifications" is a statement about the validator, and only the second one is worth asserting.</p>
- *
- * <h3>One budget, one validation</h3>
+ * verifications" is a statement about the validator, and only the second one is worth asserting.
  *
  * <p>There is deliberately no way to reset, refill or reuse a budget: no {@code reset()}, no mutable limits, and a
  * deadline fixed at construction. A quota that a retry can put back is not a quota, and a validator that starts
  * again after a failure while carrying the same budget object must find it as depleted as it left it. Unbound's
  * <a href="https://www.cve.org/CVERecord?id=CVE-2026-50045">CVE-2026-50045</a> was exactly this: work quotas that
  * were restored whenever validation restarted, so an attacker who could provoke restarts could spend the quota
- * arbitrarily many times. A caller that needs a fresh budget must construct a fresh validation.</p>
+ * arbitrarily many times. A caller that needs a fresh budget must construct a fresh validation.
  *
  * <p>Not thread-safe, and deliberately so. A budget belongs to a single validation, which runs on a single thread;
  * making the counters atomic would cost every validation something in order to support a sharing pattern that would
- * be a bug. Sharing one budget across concurrent validations is undefined and would under-count.</p>
+ * be a bug. Sharing one budget across concurrent validations is undefined and would under-count.
  */
 public final class DnssecBudget {
 
@@ -120,14 +118,14 @@ public final class DnssecBudget {
      * Throws if this validation is out of time.
      *
      * <p>Call this at the points where a validation can loop or recurse, so that work which is bounded in count but
-     * not in cost, such as verifying signatures over a very large RRset, cannot run indefinitely.</p>
+     * not in cost, such as verifying signatures over a very large RRset, cannot run indefinitely.
      *
      * <p>Running out of time is a {@link DnssecLimitExceededException}, hence
      * {@link DnssecFailureReason#LIMIT_EXCEEDED} and {@link DnssecStatus#BOGUS}, and not
      * {@link DnssecFailureReason#TIMEOUT}. The distinction is not pedantry: the records that made the validation
      * slow came from whoever is being validated, so if slowness produced an insecure answer they would be able to
      * choose it. {@link DnssecFailureReason#TIMEOUT} is for a lookup that never answered, which leaves the
-     * validator with nothing at all to judge.</p>
+     * validator with nothing at all to judge.
      *
      * @throws DnssecLimitExceededException if the deadline has passed.
      */
@@ -142,7 +140,7 @@ public final class DnssecBudget {
      * validation may perform.
      *
      * <p>Spend this immediately before the verification, not after, so that a verification which throws or hangs has
-     * still been paid for.</p>
+     * still been paid for.
      *
      * @throws DnssecLimitExceededException if the limit has been reached.
      */
@@ -189,7 +187,7 @@ public final class DnssecBudget {
      * <p>One unit is one complete hash of one name, whatever iteration count that name's {@code NSEC3} parameters
      * ask for; the iteration count itself is bounded separately by {@link DnssecLimits#maxNsec3Iterations()}, and
      * the two together are what bound the product that
-     * <a href="https://www.cve.org/CVERecord?id=CVE-2023-50868">CVE-2023-50868</a> exploited.</p>
+     * <a href="https://www.cve.org/CVERecord?id=CVE-2023-50868">CVE-2023-50868</a> exploited.
      *
      * @throws DnssecLimitExceededException if the limit has been reached.
      */
@@ -251,7 +249,7 @@ public final class DnssecBudget {
      * {@link DnssecLimits#maxDelegationDepth()}.
      *
      * <p>A count rather than a depth: a validator that walks back up and down again pays for both directions, which
-     * is what makes it a bound on work rather than on shape.</p>
+     * is what makes it a bound on work rather than on shape.
      */
     public int delegations() {
         return delegations;

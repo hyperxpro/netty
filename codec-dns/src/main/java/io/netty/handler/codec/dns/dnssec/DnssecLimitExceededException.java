@@ -24,10 +24,10 @@ import io.netty.util.internal.ObjectUtil;
  * <p>This is a hard failure. It maps to {@link DnssecFailureReason#LIMIT_EXCEEDED} and therefore to
  * {@link DnssecStatus#BOGUS}, never to {@link DnssecStatus#INSECURE}: the records that drive the work come from the
  * other side of the wire, so whoever supplies them decides whether a limit is reached, and a limit breach that
- * downgraded a zone to <em>Insecure</em> would be a downgrade oracle rather than a defence.</p>
+ * downgraded a zone to <em>Insecure</em> would be a downgrade oracle rather than a defence.
  *
  * <p>{@link #limitName()} names the knob that ran out, which is what an operator needs in order to decide whether a
- * limit is genuinely too tight or whether they are looking at an attack.</p>
+ * limit is genuinely too tight or whether they are looking at an attack.
  *
  * <p><strong>To cover the whole validation path, catch
  * {@link io.netty.handler.codec.DecoderException DecoderException}, not {@link DnssecException}.</strong> This class
@@ -37,7 +37,7 @@ import io.netty.util.internal.ObjectUtil;
  * {@code NSEC} type bit map therefore slips straight through a {@code catch (DnssecException)} and surfaces as a
  * decode failure at the pipeline instead of becoming the {@link DnssecStatus#BOGUS} verdict it is: the answer is
  * inconsistent with what the zone signed, which is precisely a validation failure. {@code DecoderException} is the
- * narrowest type that covers both.</p>
+ * narrowest type that covers both.
  */
 public final class DnssecLimitExceededException extends DnssecException {
 

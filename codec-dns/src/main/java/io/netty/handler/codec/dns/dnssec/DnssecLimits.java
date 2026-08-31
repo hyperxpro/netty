@@ -22,7 +22,7 @@ import io.netty.util.internal.ObjectUtil;
  *
  * <p><a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-5.4">RFC 4035, Section 5.4</a> already tells a
  * validator that it "MUST bound the work it performs"; the decade since has turned that sentence into a list of
- * named vulnerabilities. Every knob here exists because some validator did not have it:</p>
+ * named vulnerabilities. Every knob here exists because some validator did not have it:
  * <ul>
  *   <li><a href="https://www.cve.org/CVERecord?id=CVE-2023-50387">CVE-2023-50387</a>, KeyTrap: a single response can
  *   demand tens of thousands of signature verifications, because the key tag is a checksum rather than an
@@ -33,10 +33,10 @@ import io.netty.util.internal.ObjectUtil;
  *
  * <p>The defaults are taken from what deployed validators settled on after those disclosures and are quoted on each
  * accessor. They are deliberately generous enough not to reject real zones and deliberately far below what an
- * attacker needs.</p>
+ * attacker needs.
  *
  * <p>Reaching a limit is {@link DnssecFailureReason#LIMIT_EXCEEDED}, and therefore
- * {@link DnssecStatus#BOGUS}. Anything else would let whoever chose the records choose the security state.</p>
+ * {@link DnssecStatus#BOGUS}. Anything else would let whoever chose the records choose the security state.
  *
  * <pre>
  * DnssecLimits limits = DnssecLimits.newBuilder()
@@ -131,14 +131,14 @@ public final class DnssecLimits {
      * <a href="https://www.cve.org/CVERecord?id=CVE-2023-50387">CVE-2023-50387</a> (KeyTrap): the key tag of
      * <a href="https://www.rfc-editor.org/rfc/rfc4034.html#appendix-B">RFC 4034, Appendix B</a> is a 16-bit
      * checksum, not a unique identifier, so a zone may publish arbitrarily many keys that all "match" one signature
-     * and force a verification each.</p>
+     * and force a verification each.
      *
      * <p>The deviation is where the specification is heading rather than a private shortcut:
      * <a href="https://www.rfc-editor.org/errata/eid8037">RFC 4035 Errata 8037</a>, Held for Document Update,
-     * proposes changing that {@code MUST} to a {@code SHOULD} and cites the CVE as the reason.</p>
+     * proposes changing that {@code MUST} to a {@code SHOULD} and cites the CVE as the reason.
      *
      * <p>The cost of the deviation is a false negative in the pathological case where a legitimate zone publishes
-     * more than this many colliding keys, which does not happen by accident.</p>
+     * more than this many colliding keys, which does not happen by accident.
      */
     public int maxSignatureVerificationsPerRrset() {
         return maxSignatureVerificationsPerRrset;
@@ -151,10 +151,10 @@ public final class DnssecLimits {
      * <p>The per-RRset limit alone is not enough. A response may carry many RRsets, each within its own budget, so
      * the total work stays quadratic in the size of the response: this is the "KeySigTrap" shape of KeyTrap, where
      * <em>n</em> keys and <em>n</em> signatures multiply. dnsjava has no per-message cap and is quadratic for
-     * exactly that reason.</p>
+     * exactly that reason.
      *
      * <p>Must be at least {@link #maxSignatureVerificationsPerRrset()}, otherwise the per-RRset limit could never be
-     * reached and one of the two would be silently dead.</p>
+     * reached and one of the two would be silently dead.
      */
     public int maxSignatureVerificationsPerValidation() {
         return maxSignatureVerificationsPerValidation;
@@ -165,7 +165,7 @@ public final class DnssecLimits {
      * abandoned. Defaults to {@code 4}, which is dnsjava's {@code max_ds_match_failures}.
      *
      * <p>Matching a {@code DS} means hashing a candidate {@code DNSKEY}, so a parent that publishes many
-     * non-matching {@code DS} records buys a digest computation each. A real delegation needs one or two.</p>
+     * non-matching {@code DS} records buys a digest computation each. A real delegation needs one or two.
      */
     public int maxDsMatchFailures() {
         return maxDsMatchFailures;
@@ -178,7 +178,7 @@ public final class DnssecLimits {
      * <p>This is the narrowest and most direct answer to KeyTrap. Key tags are not unique, and a collision is cheap
      * to manufacture, so a zone can publish a wall of keys that all appear to match one signature. Two is enough for
      * the accidental collisions that occur in practice during a key roll, and far short of the "LockCram" primitive
-     * that piles colliding keys into one RRset.</p>
+     * that piles colliding keys into one RRset.
      */
     public int maxDnskeysPerKeyTag() {
         return maxDnskeysPerKeyTag;
@@ -188,7 +188,7 @@ public final class DnssecLimits {
      * The greatest number of {@code DNSKEY} records accepted in one zone's key set. Defaults to {@code 16}.
      *
      * <p>A zone in the middle of an algorithm roll publishes a handful; anything approaching this many is a zone
-     * trying to make the validator's grouping and matching work expensive.</p>
+     * trying to make the validator's grouping and matching work expensive.
      */
     public int maxDnskeysPerRrset() {
         return maxDnskeysPerRrset;
@@ -202,13 +202,18 @@ public final class DnssecLimits {
     }
 
     /**
-     * The greatest {@code NSEC3} iteration count that is still validated. Defaults to {@code 100}.
+     * The greatest {@code NSEC3} iteration count that is still validated. Defaults to {@code 50}, the same as
+     * {@link #maxNsec3IterationsHardFail()}.
      *
-     * <p><a href="https://www.rfc-editor.org/rfc/rfc9276.html#appendix-A">RFC 9276, Appendix A</a> describes exactly
-     * this two-threshold scheme: above a first bound the validator should "return an insecure response", and above a
-     * second, higher bound a "SERVFAIL" (bogus). A count above this one is reported as
-     * {@link DnssecFailureReason#NSEC3_ITERATIONS_TOO_HIGH}; RFC 9276, Section 3.1 asks zones to publish an
-     * iteration count of zero, so no correctly operated zone is affected.</p>
+     * <p>The two defaults are equal on purpose.
+     * <a href="https://www.rfc-editor.org/rfc/rfc9276.html#section-4">RFC 9276, Section 4</a> uses a validator that
+     * treats a zone as insecure above 100 and returns SERVFAIL above 500 as its example of what not to do, because
+     * between those points the zone "is subject to attacker-in-the-middle attacks as if it were unsigned", and says
+     * implementations SHOULD set the two points to the same value. Raising only one of them reopens that window.
+     *
+     * <p>A count above this is reported as {@link DnssecFailureReason#NSEC3_ITERATIONS_TOO_HIGH}. RFC 9276,
+     * Section 3.1 asks zones to publish an iteration count of zero, so no correctly operated zone is affected;
+     * 50 is the limit BIND, Knot and PowerDNS converged on.
      */
     public int maxNsec3Iterations() {
         return maxNsec3Iterations;
@@ -217,14 +222,14 @@ public final class DnssecLimits {
     /**
      * The {@code NSEC3} iteration count above which the answer is rejected outright rather than downgraded.
      * Defaults to {@code 500}, the higher of the two bounds of
-     * <a href="https://www.rfc-editor.org/rfc/rfc9276.html#appendix-A">RFC 9276, Appendix A</a>.
+     * <a href="https://www.rfc-editor.org/rfc/rfc9276.html#section-4">RFC 9276, Section 4</a>.
      *
      * <p>A count above this is {@link DnssecFailureReason#LIMIT_EXCEEDED} and therefore
      * {@link DnssecStatus#BOGUS}. Keeping the "insecure" band between
      * {@link #maxNsec3Iterations()} and this value narrow is what stops the softer threshold from being a useful
-     * downgrade lever.</p>
+     * downgrade lever.
      *
-     * <p>Must be at least {@link #maxNsec3Iterations()}.</p>
+     * <p>Must be at least {@link #maxNsec3Iterations()}.
      */
     public int maxNsec3IterationsHardFail() {
         return maxNsec3IterationsHardFail;
@@ -237,7 +242,7 @@ public final class DnssecLimits {
      * of names hashed multiplied by the iterations for each. That product is
      * <a href="https://www.cve.org/CVERecord?id=CVE-2023-50868">CVE-2023-50868</a>, and the "HashTrap" variant makes
      * it quadratic by pairing many {@code NSEC3} records with a deep query name so the closest-encloser search walks
-     * every combination.</p>
+     * every combination.
      */
     public int maxNsec3HashComputations() {
         return maxNsec3HashComputations;
@@ -249,7 +254,7 @@ public final class DnssecLimits {
      * <p>The wire format allows up to 255, but
      * <a href="https://www.rfc-editor.org/rfc/rfc9276.html#section-3.1">RFC 9276, Section 3.1</a> says an
      * additional salt "provides no additional protection" and asks zones to use none at all, so any salt at all is
-     * already unusual and a long one is a sign of a zone optimising the validator's hashing cost.</p>
+     * already unusual and a long one is a sign of a zone optimising the validator's hashing cost.
      */
     public int maxNsec3SaltLength() {
         return maxNsec3SaltLength;
@@ -260,7 +265,7 @@ public final class DnssecLimits {
      * {@code 16}.
      *
      * <p>A complete {@code NSEC} proof needs at most three records; the headroom is for responses that repeat
-     * records across the answer and authority sections.</p>
+     * records across the answer and authority sections.
      */
     public int maxNsecRecordsPerProof() {
         return maxNsecRecordsPerProof;
@@ -280,7 +285,7 @@ public final class DnssecLimits {
      * validated. Defaults to {@code 32}.
      *
      * <p>A wire-form name holds at most 127 labels, so a chain cannot legitimately be deeper than that; 32 is well
-     * beyond any real delegation hierarchy and keeps the recursion shallow.</p>
+     * beyond any real delegation hierarchy and keeps the recursion shallow.
      */
     public int maxDelegationDepth() {
         return maxDelegationDepth;
@@ -293,7 +298,7 @@ public final class DnssecLimits {
      * <p>This is the limit that most directly implements the requirement of
      * <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-5.4">RFC 4035, Section 5.4</a> that a validator
      * bound its work: without it a crafted chain turns one client query into unbounded traffic aimed at whichever
-     * servers the attacker names.</p>
+     * servers the attacker names.
      */
     public int maxFetches() {
         return maxFetches;
@@ -303,7 +308,7 @@ public final class DnssecLimits {
      * The greatest number of {@code CNAME} or {@code DNAME} links followed in one answer. Defaults to {@code 16}.
      *
      * <p><a href="https://www.rfc-editor.org/rfc/rfc1034.html#section-3.6.2">RFC 1034, Section 3.6.2</a> notes that
-     * alias chains may loop and leaves the cut-off to the implementation.</p>
+     * alias chains may loop and leaves the cut-off to the implementation.
      */
     public int maxCnameChainLength() {
         return maxCnameChainLength;
@@ -315,7 +320,7 @@ public final class DnssecLimits {
      *
      * <p>Validation begins by grouping records into RRsets by owner name, class and type, and several later steps
      * pair records against one another. Both are quadratic in the size of the section in the worst case, so this
-     * bound is what keeps every one of them bounded, whatever the message claims its counts are.</p>
+     * bound is what keeps every one of them bounded, whatever the message claims its counts are.
      */
     public int maxRecordsPerSection() {
         return maxRecordsPerSection;
@@ -324,9 +329,10 @@ public final class DnssecLimits {
     /**
      * The smallest RSA modulus, in bits, whose signatures are accepted. Defaults to {@code 1024}.
      *
-     * <p><a href="https://www.rfc-editor.org/rfc/rfc5702.html#section-4.1">RFC 5702, Section 4.1</a> requires
-     * implementations to accept keys of 1024 bits and up and leaves smaller keys to local policy; keys below that
-     * are not worth the verification they cost.</p>
+     * <p>This is policy, not a requirement:
+     * <a href="https://www.rfc-editor.org/rfc/rfc5702.html#section-4.1">RFC 5702, Section 4.1</a> declines to
+     * specify key sizes. The floors the RFC does set are per algorithm, in Sections 2.1 and 2.2 — 512 bits for
+     * RSASHA1 and RSASHA256, 1024 for RSASHA512 — and this value can only tighten them, never relax them.
      */
     public int minimumRsaKeySizeBits() {
         return minimumRsaKeySizeBits;
@@ -338,7 +344,7 @@ public final class DnssecLimits {
      * <p>Exceeding it is {@link DnssecFailureReason#LIMIT_EXCEEDED}, not
      * {@link DnssecFailureReason#TIMEOUT}: a validation that runs out of time has been made expensive by the records
      * it was given, so it fails the same way as any other limit breach. A network lookup that does not answer is a
-     * different thing and is {@link DnssecFailureReason#TIMEOUT}.</p>
+     * different thing and is {@link DnssecFailureReason#TIMEOUT}.
      */
     public long validationTimeoutMillis() {
         return validationTimeoutMillis;
@@ -349,7 +355,7 @@ public final class DnssecLimits {
      *
      * <p>Explicitly zero, so that a deployment which needs a grace period has to ask for one. Every second of skew
      * is a second during which an expired signature is still accepted, and a silent default would hide a broken
-     * clock until it became a much larger problem.</p>
+     * clock until it became a much larger problem.
      */
     public long clockSkewSeconds() {
         return clockSkewSeconds;
@@ -363,7 +369,7 @@ public final class DnssecLimits {
      * <a href="https://www.rfc-editor.org/rfc/rfc9904.html">RFC 9904</a>, even though they are no longer to be used
      * for signing. Turning this off does not make anything more secure: an alg-7 zone simply stops validating and
      * becomes {@link DnssecStatus#INSECURE}, which is a self-inflicted downgrade of every zone that has not yet
-     * rolled.</p>
+     * rolled.
      */
     public boolean allowSha1Signatures() {
         return allowSha1Signatures;
@@ -375,7 +381,7 @@ public final class DnssecLimits {
      * <p>Digest type 1 is {@code MUST} implement for validation under
      * <a href="https://www.rfc-editor.org/rfc/rfc9904.html">RFC 9904</a>. As with
      * {@link #allowSha1Signatures()}, refusing it turns working delegations
-     * {@link DnssecStatus#INSECURE} rather than making anything safer.</p>
+     * {@link DnssecStatus#INSECURE} rather than making anything safer.
      */
     public boolean allowSha1DsDigest() {
         return allowSha1DsDigest;
@@ -410,7 +416,7 @@ public final class DnssecLimits {
      * Builds a {@link DnssecLimits}. Every setter validates its argument immediately, and {@link #build()} checks
      * the two constraints that involve more than one knob.
      *
-     * <p>Not thread-safe; build the instance on one thread and share the result, which is immutable.</p>
+     * <p>Not thread-safe; build the instance on one thread and share the result, which is immutable.
      */
     public static final class Builder {
 
@@ -420,8 +426,8 @@ public final class DnssecLimits {
         private int maxDnskeysPerKeyTag = 2;
         private int maxDnskeysPerRrset = 16;
         private int maxDsRecordsPerRrset = 16;
-        private int maxNsec3Iterations = 100;
-        private int maxNsec3IterationsHardFail = 500;
+        private int maxNsec3Iterations = 50;
+        private int maxNsec3IterationsHardFail = 50;
         private int maxNsec3HashComputations = 64;
         private int maxNsec3SaltLength = 32;
         private int maxNsecRecordsPerProof = 16;

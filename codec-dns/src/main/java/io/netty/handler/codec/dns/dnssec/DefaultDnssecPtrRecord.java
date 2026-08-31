@@ -49,6 +49,16 @@ public final class DefaultDnssecPtrRecord extends DefaultDnssecRawRecord impleme
         hostname = DefaultDnsRecordDecoder.decodeName(content.duplicate());
     }
 
+    /**
+     * Reuses the fields already parsed from {@code record}: re-parsing a buffer a caller has read from would
+     * fail, and {@code duplicate()} shares this record's reference count, so releasing on that failure would
+     * free a buffer this record still holds.
+     */
+    private DefaultDnssecPtrRecord(DefaultDnssecPtrRecord record, ByteBuf content) {
+        super(record, content);
+        hostname = record.hostname;
+    }
+
     @Override
     public String hostname() {
         return hostname;
@@ -66,17 +76,17 @@ public final class DefaultDnssecPtrRecord extends DefaultDnssecRawRecord impleme
 
     @Override
     public DefaultDnssecPtrRecord copy() {
-        return replace(content().copy());
+        return new DefaultDnssecPtrRecord(this, content().copy());
     }
 
     @Override
     public DefaultDnssecPtrRecord duplicate() {
-        return replace(content().duplicate());
+        return new DefaultDnssecPtrRecord(this, content().duplicate());
     }
 
     @Override
     public DefaultDnssecPtrRecord retainedDuplicate() {
-        return replace(content().retainedDuplicate());
+        return new DefaultDnssecPtrRecord(this, content().retainedDuplicate());
     }
 
     @Override

@@ -71,6 +71,19 @@ public final class DnsNsec3ParamRecord extends AbstractDnssecRecord {
     }
 
     /**
+     * Reuses the fields already parsed from {@code record}: re-parsing a buffer a caller has read from would
+     * fail, and {@code duplicate()} shares this record's reference count, so releasing on that failure would
+     * free a buffer this record still holds.
+     */
+    private DnsNsec3ParamRecord(DnsNsec3ParamRecord record, ByteBuf content) {
+        super(record.name(), record.type(), record.dnsClass(), record.timeToLive(), record.owner(), content);
+        hashAlgorithm = record.hashAlgorithm;
+        flags = record.flags;
+        iterations = record.iterations;
+        salt = record.salt;
+    }
+
+    /**
      * Returns the Hash Algorithm field. RFC 5155 defines only {@code 1}, SHA-1.
      */
     public int hashAlgorithm() {
@@ -104,17 +117,17 @@ public final class DnsNsec3ParamRecord extends AbstractDnssecRecord {
 
     @Override
     public DnsNsec3ParamRecord copy() {
-        return replace(content().copy());
+        return new DnsNsec3ParamRecord(this, content().copy());
     }
 
     @Override
     public DnsNsec3ParamRecord duplicate() {
-        return replace(content().duplicate());
+        return new DnsNsec3ParamRecord(this, content().duplicate());
     }
 
     @Override
     public DnsNsec3ParamRecord retainedDuplicate() {
-        return replace(content().retainedDuplicate());
+        return new DnsNsec3ParamRecord(this, content().retainedDuplicate());
     }
 
     @Override

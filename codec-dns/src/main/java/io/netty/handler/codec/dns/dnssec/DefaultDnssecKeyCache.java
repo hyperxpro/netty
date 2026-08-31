@@ -33,14 +33,14 @@ import java.util.Map;
  * <p>Both bounds are load-bearing rather than tidiness. The zone names a validation looks up are chosen by whoever
  * sent the query, so an unbounded map keyed by zone is a memory-exhaustion primitive; and a key set that outlived
  * its TTL is a key set the zone may have rolled away from, which turns a rollover into a stretch of Bogus answers
- * that no operator can explain.</p>
+ * that no operator can explain.
  *
  * <p>The stored form is a copy of each {@code DNSKEY} record's {@code RDATA} octets, so this cache holds nothing
  * reference-counted and never has to release anything. {@link #get(DnsName, long)} builds fresh records over
- * copies of those octets, which the caller owns; see {@link DnssecKeyCache} for why it is done that way.</p>
+ * copies of those octets, which the caller owns; see {@link DnssecKeyCache} for why it is done that way.
  *
  * <p>Thread-safe. Every operation takes one lock over the whole map, which is sound for a structure this small:
- * an entry is a handful of keys and the map holds {@link #maxZones()} of them.</p>
+ * an entry is a handful of keys and the map holds {@link #maxZones()} of them.
  */
 public final class DefaultDnssecKeyCache implements DnssecKeyCache {
 
@@ -76,13 +76,6 @@ public final class DefaultDnssecKeyCache implements DnssecKeyCache {
                 return size() > DefaultDnssecKeyCache.this.maxZones;
             }
         };
-    }
-
-    /**
-     * Returns the greatest number of zones this cache remembers.
-     */
-    public int maxZones() {
-        return maxZones;
     }
 
     /**

@@ -31,7 +31,7 @@ import java.util.List;
  * every step of a chain of trust is made of.
  *
  * <p><a href="https://www.rfc-editor.org/rfc/rfc4034.html#section-5.1.4">RFC 4034, Section 5.1.4</a> defines the
- * relationship as</p>
+ * relationship as
  *
  * <pre>
  * digest = digest_algorithm( DNSKEY owner name | DNSKEY RDATA )
@@ -40,13 +40,11 @@ import java.util.List;
  *
  * <p>with the owner name in the canonical form of Section 6.2, so downcased, and the {@code RDATA} exactly as it
  * appears on the wire. Because the owner name is inside the digest, a {@code DS} is bound to one name as well as to
- * one key.</p>
- *
- * <h3>The verdict a caller has to reach</h3>
+ * one key.
  *
  * <p>Whether a delegation is secure is not a single boolean, and the three outcomes are easy to conflate. The
  * procedure, from <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-5.2">RFC 4035, Section 5.2</a> as
- * extended by <a href="https://www.rfc-editor.org/rfc/rfc6840.html#section-5.2">RFC 6840, Section 5.2</a>, is:</p>
+ * extended by <a href="https://www.rfc-editor.org/rfc/rfc6840.html#section-5.2">RFC 6840, Section 5.2</a>, is:
  *
  * <pre>
  * List&lt;DnsDsRecord&gt; usable = DnssecDsMatcher.usable(dsRrset, limits);
@@ -63,14 +61,14 @@ import java.util.List;
  * authenticated DS records that specify unknown or unsupported DNSKEY algorithms" and, from that document onwards,
  * unknown or unsupported <em>digest</em> algorithms too; if none are left "the zone is treated as if it were
  * unsigned". Reporting Bogus there instead would make every zone that rolls to an algorithm this build does not
- * know unreachable rather than merely unvalidated.</p>
+ * know unreachable rather than merely unvalidated.
  *
  * <p>Digests are compared with {@link PlatformDependent#equalsConstantTime(byte[], int, byte[], int, int)} rather
  * than {@code Arrays.equals}. The comparison is against a value the other side chose, and an early-exit comparison
  * leaks, through timing, how many leading octets of a guess were right — which turns finding a matching digest
- * from a search over the whole output into a search one octet at a time.</p>
+ * from a search over the whole output into a search one octet at a time.
  *
- * <p>This class is stateless and thread-safe.</p>
+ * <p>This class is stateless and thread-safe.
  */
 public final class DnssecDsMatcher {
 
@@ -81,7 +79,7 @@ public final class DnssecDsMatcher {
      * Computes {@code digest_algorithm( DNSKEY owner name | DNSKEY RDATA )} of RFC 4034, Section 5.1.4.
      *
      * <p>The owner name is downcased first, so a zone published with a mixed-case owner produces the same digest as
-     * the same zone published in lower case, which is what makes a {@code DS} comparable at all.</p>
+     * the same zone published in lower case, which is what makes a {@code DS} comparable at all.
      *
      * @param digestType the digest algorithm, from the {@code DS} Digest Type field.
      * @param owner      the {@code DNSKEY} owner name, in wire form.
@@ -114,11 +112,11 @@ public final class DnssecDsMatcher {
      *
      * <p>The key tag and algorithm are compared first because they are free, but neither is what makes the match:
      * a key tag is a 16-bit checksum that RFC 4034, Appendix B says explicitly does not identify a key. Only the
-     * digest does.</p>
+     * digest does.
      *
      * <p>The owner names are required to be equal as well. That is not in Section 5.1.4, where the digest already
      * covers the name, but it stops a {@code DS} published at one name from being offered as the parent link of a
-     * key at another, without the caller having to remember to check.</p>
+     * key at another, without the caller having to remember to check.
      *
      * @param ds     the delegation signer record from the parent zone.
      * @param key    the candidate key from the child zone.
@@ -166,7 +164,7 @@ public final class DnssecDsMatcher {
      *
      * <p>An empty result does not mean the delegation is broken. It means the parent named only algorithms or
      * digests that cannot be evaluated here, and RFC 6840, Section 5.2 requires the child to be treated as
-     * unsigned, that is {@link DnssecStatus#INSECURE}.</p>
+     * unsigned, that is {@link DnssecStatus#INSECURE}.
      *
      * @param dsRecords the parent's {@code DS} RRset.
      * @param limits    consulted for {@link DnssecLimits#allowSha1DsDigest()}, which lets an operator refuse digest
@@ -197,7 +195,7 @@ public final class DnssecDsMatcher {
      * <p>Call it with the output of {@link #usable(Collection, DnssecLimits)}, so that a {@code DS} nobody can
      * evaluate is never mistaken for one that failed to match. An empty result from a non-empty input is
      * {@link DnssecStatus#BOGUS}: the parent named keys in a language we speak and the child produced none of
-     * them.</p>
+     * them.
      *
      * @param dsRecords the parent's usable {@code DS} records.
      * @param keys      the child's apex {@code DNSKEY} RRset.

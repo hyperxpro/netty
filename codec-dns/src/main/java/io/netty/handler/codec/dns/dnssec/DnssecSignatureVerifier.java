@@ -39,14 +39,12 @@ import java.util.List;
  * {@link DnssecCanonicalizer}'s work, and the signature check of Section 5.3.3. It is <em>not</em> a chain of
  * trust. It answers "is this RRset signed by one of these keys", and says nothing about where the keys came from,
  * whether the records are in bailiwick, or whether a wildcard answer came with the proof it needs. A caller that
- * treats a {@link DnssecStatus#SECURE} result here as an authenticated answer has built a bypass.</p>
- *
- * <h3>Every check runs before any cryptography</h3>
+ * treats a {@link DnssecStatus#SECURE} result here as an authenticated answer has built a bypass.
  *
  * <p>The order is deliberate and is most of the defence against
  * <a href="https://www.cve.org/CVERecord?id=CVE-2023-50387">KeyTrap</a>. Each check below is free compared with a
  * signature verification, so an attacker who wants to make this class do expensive work has to get an
- * {@code RRSIG} past all of them first:</p>
+ * {@code RRSIG} past all of them first:
  * <ol>
  *   <li>the {@code RRSIG} and the RRset have the same class (RFC 4035, Section 5.3.1);</li>
  *   <li>and the same owner name;</li>
@@ -77,16 +75,14 @@ import java.util.List;
  * validator "MUST NOT" alter the validation process because of it, and
  * <a href="https://www.rfc-editor.org/rfc/rfc6840.html#section-6.2">RFC 6840, Section 6.2</a> points out that a
  * {@code DS} may perfectly well match a key with the bit clear. Filtering on it breaks working zones and secures
- * nothing.</p>
+ * nothing.
  *
  * <p>Two further rules come from <a href="https://www.rfc-editor.org/rfc/rfc6840.html">RFC 6840</a>. Section 5.12
  * requires an {@code RRSIG} with no corresponding {@code DNSKEY}, or with an algorithm that does not appear in the
  * {@code DNSKEY} RRset, to be disregarded, and doing that first costs nothing while removing the cheapest way to
  * force key lookups. Section 5.4 says any single valid {@code RRSIG} is sufficient and the RRset is Bogus only if
  * they all fail, so this class stops at the first success: BIND's
- * <a href="https://www.cve.org/CVERecord?id=CVE-2026-11605">CVE-2026-11605</a> was the cost of carrying on.</p>
- *
- * <h3>Bounded work</h3>
+ * <a href="https://www.cve.org/CVERecord?id=CVE-2026-11605">CVE-2026-11605</a> was the cost of carrying on.
  *
  * <p>RFC 4035, Section 5.3.1 says a validator "MUST try each matching DNSKEY RR until either the signature is
  * validated or the validator has run out of matching public keys to try". That loop is what KeyTrap exploits, and
@@ -97,18 +93,24 @@ import java.util.List;
  * the work come from the other side of the wire, so a limit that downgraded a zone would be a downgrade oracle.
  * <a href="https://www.rfc-editor.org/errata/eid8037">RFC 4035 erratum 8037</a> proposes softening that MUST to a
  * SHOULD, citing CVE-2023-50387, so this is the direction the specification is moving rather than a departure
- * from it.</p>
- *
- * <h3>Provider limitations are Insecure, not Bogus</h3>
+ * from it.
  *
  * <p>An algorithm this JVM does not offer, or a well-formed key its provider refuses to build, yields
  * {@link DnssecStatus#INSECURE} with {@link DnssecFailureReason#UNSUPPORTED_DNSKEY_ALGORITHM} or
  * {@link DnssecFailureReason#LOCAL_CRYPTO_UNAVAILABLE}. {@code Ed25519} and {@code Ed448} are simply absent before
  * Java 15, and that is a fact about the runtime, not evidence about the zone. Only data that is provably wrong is
- * Bogus.</p>
+ * Bogus.
+ *
+ * <p>That judgement is made about the <em>zone</em>, from the whole key set it was given, and not one
+ * {@code RRSIG} at a time. RFC 6840, Section 5.2's "treat as unsigned" is for a zone this build can evaluate
+ * nothing of; a zone that also publishes an algorithm this build does implement is validatable, so an RRset
+ * carrying only {@code RRSIG}s of the other algorithm is Bogus. The distinction is the difference between an
+ * honest downgrade and an attacker's: a zone in the middle of an algorithm rollover publishes both, and deciding
+ * per {@code RRSIG} would let anyone who can discard the signatures made with the supported algorithm strip
+ * DNSSEC from it.
  *
  * <p>Instances are immutable and safe to share between threads. A {@link DnssecBudget} is not: it belongs to one
- * validation.</p>
+ * validation.
  */
 public final class DnssecSignatureVerifier {
 
@@ -166,7 +168,7 @@ public final class DnssecSignatureVerifier {
      *
      * <p>Only for a caller that is checking a single RRset. A chain of trust must create one budget and pass it to
      * every call, because a quota that each step refills is not a quota; that is Unbound's
-     * <a href="https://www.cve.org/CVERecord?id=CVE-2026-50045">CVE-2026-50045</a>.</p>
+     * <a href="https://www.cve.org/CVERecord?id=CVE-2026-50045">CVE-2026-50045</a>.
      */
     public DnssecVerificationResult verify(DnsRRset rrset, Collection<DnsDnskeyRecord> keys) {
         return verify(rrset, keys, new DnssecBudget(limits, clock));
@@ -204,7 +206,12 @@ public final class DnssecSignatureVerifier {
             return DnssecVerificationResult.failed(DnssecFailureReason.RRSIGS_MISSING,
                     "no RRSIG covers " + rrset.owner() + ' ' + rrset.type());
         }
-        Failure failure = new Failure();
+        // RFC 6840, Section 5.2 treats a zone none of whose algorithms this build can evaluate as unsigned, and
+        // this is where that is decided: at the zone, from its whole key set, and not one RRSIG at a time. A zone
+        // that also offers an algorithm this build implements is validatable, so an RRSIG naming another one
+        // leaves the RRset failing to validate rather than unsigned. Deciding it per RRSIG would mean anyone who
+        // can discard the signatures made with the supported algorithm can strip DNSSEC from the zone.
+        Failure failure = new Failure(hasUsableAlgorithm(keys));
         if (!checkHomogeneous(rrset, failure)) {
             return failure.toResult();
         }
@@ -238,43 +245,58 @@ public final class DnssecSignatureVerifier {
                 continue;
             }
 
-            DnsName signedOwner = DnssecCanonicalizer.signedOwner(rrsig, rrset.owner());
-            ByteBuf signedData;
-            try {
-                signedData = DnssecCanonicalizer.signedData(ByteBufAllocator.DEFAULT, rrsig, rrset);
-            } catch (DnssecCanonicalizationException e) {
-                failure.record(e.reason(), e.getMessage());
-                continue;
-            }
+            ByteBuf signedData = null;
             try {
                 for (int j = 0; j < candidates.size(); j++) {
                     DnsDnskeyRecord key = candidates.get(j);
                     if (!checkKey(key, failure)) {
                         continue;
                     }
+                    // Everything past here costs real work whether or not a signature is ever checked: decoding a
+                    // key runs the RFC 3110 length and the curve-membership checks, and canonicalising the RRset
+                    // sorts and copies all of it. The quota is therefore taken now rather than at the verify()
+                    // call, which also means a verification that throws has been paid for.
+                    verificationsForThisRrset = spendVerification(budget, verificationsForThisRrset);
                     PublicKey publicKey = decode(key, failure);
                     if (publicKey == null) {
                         continue;
                     }
-                    if (verificationsForThisRrset >= limits.maxSignatureVerificationsPerRrset()) {
-                        throw new DnssecLimitExceededException("maxSignatureVerificationsPerRrset",
-                                limits.maxSignatureVerificationsPerRrset());
+                    if (signedData == null) {
+                        try {
+                            signedData = DnssecCanonicalizer.signedData(ByteBufAllocator.DEFAULT, rrsig, rrset);
+                        } catch (DnssecCanonicalizationException e) {
+                            // The RRset has no canonical form at all, so another key would not help.
+                            failure.record(e.reason(), e.getMessage());
+                            break;
+                        }
                     }
-                    // Spent before the call, so that a verification which throws has still been paid for.
-                    budget.spendSignatureVerification();
-                    verificationsForThisRrset++;
                     if (verifySignature(rrsig, key, publicKey, signedData, failure)) {
                         // RFC 6840, Section 5.4: one valid RRSIG is enough, and looking at the rest is what
                         // CVE-2026-11605 was.
+                        DnsName signedOwner = DnssecCanonicalizer.signedOwner(rrsig, rrset.owner());
                         return DnssecVerificationResult.secure(rrsig, key, signedOwner,
                                 rrsig.labels() < ownerLabels);
                     }
                 }
             } finally {
-                signedData.release();
+                if (signedData != null) {
+                    signedData.release();
+                }
             }
         }
         return failure.toResult();
+    }
+
+    /**
+     * Charges one signature verification to both quotas and returns the new count for this RRset.
+     */
+    private int spendVerification(DnssecBudget budget, int verificationsForThisRrset) {
+        if (verificationsForThisRrset >= limits.maxSignatureVerificationsPerRrset()) {
+            throw new DnssecLimitExceededException("maxSignatureVerificationsPerRrset",
+                    limits.maxSignatureVerificationsPerRrset());
+        }
+        budget.spendSignatureVerification();
+        return verificationsForThisRrset + 1;
     }
 
     /**
@@ -340,11 +362,11 @@ public final class DnssecSignatureVerifier {
      *
      * <p>Both are unsigned 32-bit seconds since the epoch compared with RFC 1982 serial arithmetic, so the test is
      * the sign of a 32-bit difference and not a comparison of two widened {@code long}s. The difference is
-     * unobservable today and total in 2106, when the fields wrap.</p>
+     * unobservable today and total in 2106, when the fields wrap.
      *
      * <p>{@link DnssecLimits#clockSkewSeconds()} is applied to the validator's own notion of "now" and never to the
      * record's fields: adding it to an expiration that is close to the wrap point would move the expiration into
-     * the past.</p>
+     * the past.
      */
     private boolean checkValidityPeriod(DnsRrsigRecord rrsig, Failure failure) {
         long nowSeconds = clock.currentTimeMillis() / 1000L;
@@ -404,7 +426,7 @@ public final class DnssecSignatureVerifier {
      * <p>More than {@link DnssecLimits#maxDnskeysPerKeyTag()} of them is a hard failure rather than a truncation.
      * A key tag is a 16-bit checksum and RFC 4034, Appendix B says outright that it does not identify a key, so an
      * attacker can manufacture as many colliding keys as they please and make every one of them a verification the
-     * validator must perform.</p>
+     * validator must perform.
      */
     private List<DnsDnskeyRecord> candidateKeys(DnsRrsigRecord rrsig, Collection<DnsDnskeyRecord> keys) {
         List<DnsDnskeyRecord> candidates = new ArrayList<DnsDnskeyRecord>(2);
@@ -433,6 +455,21 @@ public final class DnssecSignatureVerifier {
             candidates.add(key);
         }
         return candidates;
+    }
+
+    /**
+     * Returns {@code true} if any offered key names an algorithm {@link #isUsable(DnssecAlgorithm)} accepts, which
+     * is the whole of the RFC 6840, Section 5.2 question: is there anything about this zone this build could have
+     * validated?
+     */
+    private boolean hasUsableAlgorithm(Collection<DnsDnskeyRecord> keys) {
+        for (Iterator<DnsDnskeyRecord> i = keys.iterator(); i.hasNext();) {
+            DnsDnskeyRecord key = i.next();
+            if (key != null && isUsable(key.algorithm())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -502,7 +539,7 @@ public final class DnssecSignatureVerifier {
      * Converts an {@code RRSIG} Signature field into the encoding the JCA expects, and rejects any length the
      * algorithm cannot have produced before a single cryptographic operation is performed.
      *
-     * <p>Two conversions are mandatory rather than tidy, and both were measured rather than assumed:</p>
+     * <p>Two conversions are mandatory rather than tidy, and both were measured rather than assumed:
      * <ul>
      *   <li>DNSSEC carries an ECDSA signature as the fixed-width {@code r || s} of RFC 6605, Section 4, and SunEC
      *   rejects that outright; it wants ASN.1 DER.</li>
@@ -543,13 +580,22 @@ public final class DnssecSignatureVerifier {
      * <p>The ranking matters for one reason beyond diagnostics: every reason that means "cannot evaluate" ranks
      * below every reason that means "provably wrong", so a set of {@code RRSIG}s that could none of them be
      * evaluated yields {@link DnssecStatus#INSECURE} while a set containing even one demonstrable inconsistency
-     * yields {@link DnssecStatus#BOGUS}.</p>
+     * yields {@link DnssecStatus#BOGUS}.
+     *
+     * <p>"Could not evaluate" survives into the verdict only when the zone offers nothing this build can evaluate.
+     * Otherwise the zone is validatable and an RRset that did not validate against it is Bogus, whatever the
+     * reason the individual {@code RRSIG}s failed for.
      */
     private static final class Failure {
 
+        private final boolean zoneIsEvaluatable;
         private DnssecFailureReason reason = DnssecFailureReason.DNSSEC_BOGUS;
         private String message = "no RRSIG could be verified";
         private int rank = Integer.MIN_VALUE;
+
+        Failure(boolean zoneIsEvaluatable) {
+            this.zoneIsEvaluatable = zoneIsEvaluatable;
+        }
 
         void record(DnssecFailureReason reason, String message) {
             int rank = rank(reason);
@@ -561,6 +607,11 @@ public final class DnssecSignatureVerifier {
         }
 
         DnssecVerificationResult toResult() {
+            if (zoneIsEvaluatable && reason.impliedStatus() == DnssecStatus.INSECURE) {
+                return DnssecVerificationResult.failed(DnssecFailureReason.DNSSEC_BOGUS, message
+                        + ", and the zone offers an algorithm this build does implement, so this is a failure to "
+                        + "validate rather than a zone to treat as unsigned");
+            }
             return DnssecVerificationResult.failed(reason, message);
         }
 

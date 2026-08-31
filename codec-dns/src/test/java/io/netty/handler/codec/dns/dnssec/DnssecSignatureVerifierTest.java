@@ -104,7 +104,7 @@ public class DnssecSignatureVerifierTest {
      *
      * <p>The impact is signature malleability rather than a denial-of-existence bypass: name comparison is
      * case-insensitive, so the re-cased record still covers exactly the same range of names. What is lost is the
-     * signature's commitment to the octets that were actually published.</p>
+     * signature's commitment to the octets that were actually published.
      */
     @Test
     public void testRecasedNsecNextDomainNameIsRejected() {
@@ -431,6 +431,32 @@ public class DnssecSignatureVerifierTest {
         }
     }
 
+    /**
+     * The judgement is about the zone and not about the one {@code RRSIG} in hand. RFC 4035, Section 5.2 treats a
+     * zone this build can evaluate nothing of as unsigned; a zone that also publishes an algorithm this build does
+     * implement is validatable, so an RRset carrying only an {@code RRSIG} of the other algorithm has failed to
+     * validate rather than earned a downgrade. Without this, discarding the signatures made with the supported
+     * algorithm strips DNSSEC from every zone in the middle of an algorithm rollover.
+     */
+    @Test
+    public void testUnsupportedAlgorithmIsBogusWhenTheZoneOffersOneThatIsSupported() {
+        DnsDnskeyRecord unsupported = DnssecRRsetFixtures.dnskey(EXAMPLE, 256, 3, DnssecAlgorithm.DSA, "AQID");
+        DnsDnskeyRecord supported = DnssecRRsetFixtures.zoneSigningKey();
+        DnsRrsigRecord rrsig = DnssecRRsetFixtures.rrsig(EXAMPLE, DnsRecordType.NSEC, DnssecAlgorithm.DSA, 1, 3600,
+                RFC4035_EXPIRATION, RFC4035_INCEPTION, unsupported.keyTag(), wireName("example."), hex("00"));
+        DnsRRset rrset = nsecRRset("a.example.", rrsig);
+        try {
+            assertFalse(DnssecAlgorithm.DSA.isSupported());
+            assertTrue(supported.algorithm().isSupported());
+            DnssecVerificationResult result = verifierAt(RFC4035_VALID_AT)
+                    .verify(rrset, Arrays.asList(unsupported, supported));
+            assertSame(DnssecStatus.BOGUS, result.status(), result.message());
+        } finally {
+            release(rrset);
+            releaseAll(unsupported, supported);
+        }
+    }
+
     @Test
     public void testAlgorithmRefusedByPolicyIsInsecure() {
         DnsDnskeyRecord zsk = DnssecRRsetFixtures.zoneSigningKey();
@@ -636,6 +662,49 @@ public class DnssecSignatureVerifierTest {
             release(rrset);
             zsk.release();
         }
+    }
+
+    /**
+     * The quota is taken before the expensive work and not at the {@link java.security.Signature#verify(byte[])}
+     * call. Canonicalising the RRset and decoding a {@code DNSKEY} are the bulk of what an {@code RRSIG} costs,
+     * and an {@code RRSIG} naming a key that will not decode spends both without ever reaching a signature check,
+     * so a quota charged afterwards leaves the counters reading zero while the work is done.
+     */
+    @Test
+    public void testAnRrsigNamingAnUndecodableKeyIsCharged() {
+        DnsDnskeyRecord key = undecodableKey();
+        List<DnsRrsigRecord> rrsigs = new ArrayList<DnsRrsigRecord>();
+        for (int i = 0; i < 16; i++) {
+            rrsigs.add(DnssecRRsetFixtures.rrsig(EXAMPLE, DnsRecordType.NSEC, DnssecAlgorithm.RSASHA1, 1, 3600,
+                    RFC4035_EXPIRATION, RFC4035_INCEPTION, key.keyTag(), wireName("example."), new byte[128]));
+        }
+        DnsRRset rrset = new DnsRRset(EXAMPLE, DnsRecordType.NSEC, DnsRecord.CLASS_IN,
+                Collections.singletonList(DnssecRRsetFixtures.apexNsec("a.example.")), rrsigs);
+        try {
+            DnssecLimits limits = DnssecLimits.defaults();
+            DnssecBudget budget = new DnssecBudget(limits, clockAt(RFC4035_VALID_AT));
+            DnssecVerificationResult result = verifierAt(RFC4035_VALID_AT)
+                    .verify(rrset, Collections.singletonList(key), budget);
+
+            assertSame(DnssecFailureReason.LIMIT_EXCEEDED, result.reason(), result.message());
+            assertEquals(limits.maxSignatureVerificationsPerRrset(), budget.signatureVerifications());
+        } finally {
+            release(rrset);
+            key.release();
+        }
+    }
+
+    /** A {@code DNSKEY} well formed enough to have a key tag, whose RFC 3110 modulus has a leading zero octet. */
+    private static DnsDnskeyRecord undecodableKey() {
+        byte[] rdata = new byte[135];
+        rdata[0] = 1;                                           // flags 0x0100, the Zone Key bit
+        rdata[2] = 3;                                           // protocol
+        rdata[3] = (byte) DnssecAlgorithm.RSASHA1.intValue();
+        rdata[4] = 1;                                           // exponent length
+        rdata[5] = 3;                                           // exponent
+        Arrays.fill(rdata, 7, rdata.length, (byte) 0x41);       // rdata[6] stays zero: the leading zero octet
+        return new DnsDnskeyRecord("example.", DnsRecordType.DNSKEY, DnsRecord.CLASS_IN, 3600, EXAMPLE,
+                Unpooled.wrappedBuffer(rdata));
     }
 
     private static DnsDnskeyRecord keyWithTag(int tag, int distinguisher) {
