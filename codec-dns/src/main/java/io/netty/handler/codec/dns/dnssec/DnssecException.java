@@ -22,7 +22,7 @@ import io.netty.handler.codec.DecoderException;
  *
  * <p>Callers are expected to distinguish the two subclasses, because
  * <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-5.2">RFC 4035, Section 5.2</a> gives them very
- * different security outcomes:</p>
+ * different security outcomes:
  * <ul>
  *   <li>{@link DnssecUnsupportedAlgorithmException} means "we cannot evaluate this", which normally makes the
  *   answer <em>Insecure</em> rather than <em>Bogus</em>;</li>
@@ -36,7 +36,7 @@ import io.netty.handler.codec.DecoderException;
  * every other decoder in this module. Both extend {@link io.netty.handler.codec.DecoderException}, so a validator
  * that means "this record cannot be trusted" must catch {@link io.netty.handler.codec.DecoderException}. Catching
  * {@code DnssecException} instead would let a malformed type bitmap escape the validation path and surface as an
- * unrelated decode failure rather than as a <em>Bogus</em> verdict.</p>
+ * unrelated decode failure rather than as a <em>Bogus</em> verdict.
  */
 public class DnssecException extends DecoderException {
 

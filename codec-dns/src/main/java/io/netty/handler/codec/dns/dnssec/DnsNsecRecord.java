@@ -61,6 +61,17 @@ public final class DnsNsecRecord extends AbstractDnssecRecord {
     }
 
     /**
+     * Reuses the fields already parsed from {@code record}: re-parsing a buffer a caller has read from would
+     * fail, and {@code duplicate()} shares this record's reference count, so releasing on that failure would
+     * free a buffer this record still holds.
+     */
+    private DnsNsecRecord(DnsNsecRecord record, ByteBuf content) {
+        super(record.name(), record.type(), record.dnsClass(), record.timeToLive(), record.owner(), content);
+        nextDomainName = record.nextDomainName;
+        types = record.types;
+    }
+
+    /**
      * Returns the Next Domain Name field: the owner name of the next RRset in the zone, in canonical order. In the
      * last {@code NSEC} of a zone this is the apex, which is how the chain closes.
      */
@@ -81,17 +92,17 @@ public final class DnsNsecRecord extends AbstractDnssecRecord {
 
     @Override
     public DnsNsecRecord copy() {
-        return replace(content().copy());
+        return new DnsNsecRecord(this, content().copy());
     }
 
     @Override
     public DnsNsecRecord duplicate() {
-        return replace(content().duplicate());
+        return new DnsNsecRecord(this, content().duplicate());
     }
 
     @Override
     public DnsNsecRecord retainedDuplicate() {
-        return replace(content().retainedDuplicate());
+        return new DnsNsecRecord(this, content().retainedDuplicate());
     }
 
     @Override

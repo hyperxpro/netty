@@ -24,9 +24,7 @@ import io.netty.util.concurrent.Future;
  * trust. This is the one thing the validator cannot do for itself, and keeping it an interface is what keeps
  * {@code codec-dns} free of I/O.
  *
- * <h3>Every query MUST set DO and CD</h3>
- *
- * <p>An implementation <strong>MUST</strong> send each query with both of these set:</p>
+ * <p>An implementation <strong>MUST</strong> send each query with both of these set:
  * <ul>
  *   <li><strong>{@code DO}</strong>, the DNSSEC OK bit of
  *   <a href="https://www.rfc-editor.org/rfc/rfc3225.html">RFC 3225</a>, so that the server returns the
@@ -43,9 +41,7 @@ import io.netty.util.concurrent.Future;
  * an upstream validating resolver answers {@code SERVFAIL} for anything it considers Bogus and strips the records
  * that would let this validator disagree, so the chain walk cannot reach an independent verdict: it sees the
  * upstream's opinion rather than the zone's data. A validator that trusts someone else's verdict is not
- * validating.</p>
- *
- * <h3>What a failure means</h3>
+ * validating.
  *
  * <p>A fetch that fails — a refused query, a malformed response, a transport error, or a timeout — makes the
  * validation {@link DnssecStatus#INDETERMINATE}, never {@link DnssecStatus#BOGUS} and never
@@ -53,20 +49,18 @@ import io.netty.util.concurrent.Future;
  * "unsigned": an attacker who can drop packets must not thereby be able to strip DNSSEC from a signed zone, and
  * must not be able to make a working zone look forged either. Complete the returned {@link Future} exceptionally
  * rather than completing it with an empty result, so that the cause survives into
- * {@link DnssecValidationResult#cause()}.</p>
+ * {@link DnssecValidationResult#cause()}.
  *
  * <p>An implementation should apply its own per-query timeout. The validator has a wall-clock backstop of
  * {@link DnssecLimits#validationTimeoutMillis()} for the whole validation, but a query that never answers should
- * be failed by whoever sent it.</p>
- *
- * <h3>Threading</h3>
+ * be failed by whoever sent it.
  *
  * <p>{@link #fetch(DnsName, DnsRecordType)} is called on the {@link io.netty.util.concurrent.EventExecutor} the
  * validation runs on and must not block it. The returned {@link Future} may complete on any thread; the validator
- * hops back to its own executor before touching validation state.</p>
+ * hops back to its own executor before touching validation state.
  *
  * <p>Implementations must be thread-safe if the {@link DnssecValidator} holding them is shared, which is the
- * intended usage.</p>
+ * intended usage.
  */
 public interface DnssecRecordFetcher {
 
@@ -76,11 +70,11 @@ public interface DnssecRecordFetcher {
      * <p>The response must be decoded with {@link DnssecDnsRecordDecoder}, or the records will not carry the wire
      * form of their owner names and nothing signed over them can be reconstructed. Wrap the decoded response with
      * {@link DnssecFetchResult#fromResponse(io.netty.handler.codec.dns.DnsResponse)}, which retains the records it
-     * keeps, and then release the response.</p>
+     * keeps, and then release the response.
      *
      * <p>The validator takes ownership of the {@link DnssecFetchResult} the future completes with and releases it
      * exactly once, including when the validation has already reached a verdict by the time the future
-     * completes.</p>
+     * completes.
      *
      * @param name the owner name to query, in wire form.
      * @param type the RR type to query, {@link DnsRecordType#DNSKEY} or {@link DnsRecordType#DS} in practice.

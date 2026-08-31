@@ -51,19 +51,27 @@ public class DefaultDnssecRawRecord extends AbstractDnssecRecord {
         super(name, type, dnsClass, timeToLive, owner, content);
     }
 
+    /**
+     * Copies {@code record}'s fields onto {@code content} without going through {@link #replace(ByteBuf)}, which
+     * a subclass may override to parse; see {@link DefaultDnssecPtrRecord}.
+     */
+    DefaultDnssecRawRecord(DefaultDnssecRawRecord record, ByteBuf content) {
+        super(record.name(), record.type(), record.dnsClass(), record.timeToLive(), record.owner(), content);
+    }
+
     @Override
     public DefaultDnssecRawRecord copy() {
-        return replace(content().copy());
+        return new DefaultDnssecRawRecord(this, content().copy());
     }
 
     @Override
     public DefaultDnssecRawRecord duplicate() {
-        return replace(content().duplicate());
+        return new DefaultDnssecRawRecord(this, content().duplicate());
     }
 
     @Override
     public DefaultDnssecRawRecord retainedDuplicate() {
-        return replace(content().retainedDuplicate());
+        return new DefaultDnssecRawRecord(this, content().retainedDuplicate());
     }
 
     @Override

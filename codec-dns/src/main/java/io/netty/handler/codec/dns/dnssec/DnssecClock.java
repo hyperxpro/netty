@@ -23,9 +23,9 @@ package io.netty.handler.codec.dns.dnssec;
  * Inception and Signature Expiration fields of an {@code RRSIG} are seconds since the UNIX epoch compared using the
  * serial number arithmetic of <a href="https://www.rfc-editor.org/rfc/rfc1982.html">RFC 1982</a>, see
  * <a href="https://www.rfc-editor.org/rfc/rfc4034.html#section-3.1.5">RFC 4034, Section 3.1.5</a>, and a validator
- * with a wrong clock rejects perfectly good signatures or, worse, accepts expired ones.</p>
+ * with a wrong clock rejects perfectly good signatures or, worse, accepts expired ones.
  *
- * <p>This is not an aesthetic nicety, it is what makes the specifications testable:</p>
+ * <p>This is not an aesthetic nicety, it is what makes the specifications testable:
  * <ul>
  *   <li>The worked examples in <a href="https://www.rfc-editor.org/rfc/rfc6605.html#section-6">RFC 6605,
  *   Section 6</a> carry signatures that expired on 2010-09-09, and those in
@@ -40,7 +40,7 @@ package io.netty.handler.codec.dns.dnssec;
  * {@link System#nanoTime()}, which is monotonic and has no defined relationship to the epoch, whereas an
  * {@code RRSIG} is stamped in wall-clock seconds. A monotonic clock is the right tool for the validation deadline
  * of {@link DnssecBudget} and the wrong one for signature validity, and mixing them up produces a validator that
- * happens to work until the machine's clock is stepped.</p>
+ * happens to work until the machine's clock is stepped.
  */
 public interface DnssecClock {
 
@@ -64,7 +64,7 @@ public interface DnssecClock {
      * {@link System#currentTimeMillis()}.
      *
      * <p>Implementations should be cheap enough to call once per record, and must be safe to call from whichever
-     * thread drives the validation.</p>
+     * thread drives the validation.
      */
     long currentTimeMillis();
 }

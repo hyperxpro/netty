@@ -23,33 +23,27 @@ import java.util.List;
  * Remembers the apex {@code DNSKEY} RRset of a zone that a {@link DnssecValidator} has <em>already</em> validated,
  * so that the next validation under the same zone does not have to fetch and re-verify it.
  *
- * <h3>Only validated keys go in, and that is the whole contract</h3>
- *
  * <p>A validator calls {@link #put(DnsName, List, long, long)} only once the RRset has been shown to be the zone's
  * real key set: a {@code DS} record from the parent, or a trust anchor, matched one specific key, and an
  * {@code RRSIG} <em>made by that key</em> validated over the whole RRset. Nothing partially validated is ever
  * stored, which is what keeps this cache from becoming the publication point for an answer that has not yet
- * reached a verdict.</p>
+ * reached a verdict.
  *
  * <p>The consequence for a caller is direct: <strong>an instance shared between two validators shares trust
  * between them.</strong> A validator configured with different trust anchors, a different clock, or different
  * {@link DnssecLimits} will happily use keys the other one accepted, because the cache records the conclusion and
  * not the reasoning that reached it. Give each set of trust anchors its own cache, or use
- * {@link #noop()} and pay for the lookups.</p>
- *
- * <h3>Reference counting</h3>
+ * {@link #noop()} and pay for the lookups.
  *
  * <p>This cache never holds a reference-counted object. {@link #put(DnsName, List, long, long)} copies the
  * {@code RDATA} it needs, and {@link #get(DnsName, long)} returns freshly built records that the <em>caller</em>
  * owns and must release. That is deliberate: a cache that owned buffer reference counts would have to release them
  * on eviction, on replacement and on clear, from whichever thread happened to trigger it, and getting one of those
- * wrong is a use-after-free rather than a stale answer.</p>
- *
- * <h3>Threading</h3>
+ * wrong is a use-after-free rather than a stale answer.
  *
  * <p>An implementation must be thread-safe. {@link DnssecValidator} is shareable and each validation runs on the
  * {@link io.netty.util.concurrent.EventExecutor} its caller supplied, so one cache is reached from as many threads
- * as there are event loops.</p>
+ * as there are event loops.
  */
 public interface DnssecKeyCache {
 
@@ -78,7 +72,7 @@ public interface DnssecKeyCache {
     /**
      * Stores the validated apex {@code DNSKEY} RRset of {@code zone}.
      *
-     * <p>The records are copied, not retained; the caller keeps ownership of the ones it passed in.</p>
+     * <p>The records are copied, not retained; the caller keeps ownership of the ones it passed in.
      *
      * @param zone              the apex name of the zone, in wire form. Every record in {@code keys} must have it
      *                          as its owner.

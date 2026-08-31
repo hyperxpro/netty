@@ -32,25 +32,21 @@ import java.util.List;
  * proof of <a href="https://www.rfc-editor.org/rfc/rfc5155.html#section-8">RFC 5155, section 8</a> as amended by
  * <a href="https://www.rfc-editor.org/rfc/rfc9276.html#section-3.2">RFC 9276, section 3.2</a>.
  *
- * <h3>Precondition: the records must already be authenticated</h3>
- *
  * <p><strong>This class verifies no signature.</strong> It answers "do these records, taken as true, prove what the
  * response claims", and nothing else. Every {@code NSEC} or {@code NSEC3} record handed to it must already have had
  * its covering {@code RRSIG} verified against an authenticated {@code DNSKEY} of {@code zone}, with the Signer's
  * Name checked to be {@code zone}. Feeding it unauthenticated records is not a partial validation, it is no
  * validation at all: anyone able to write a UDP packet can then choose the answer, since the whole content of a
- * denial proof is "these names and types are absent".</p>
+ * denial proof is "these names and types are absent".
  *
  * <p>The precondition holds even where the verdict is {@link DnssecStatus#INSECURE}. RFC 9276, section 3.2 is
  * explicit that a validator which declines to do the work an {@code NSEC3} iteration count asks for "MUST still
  * validate the signature over the NSEC3 record to ensure the iteration count was not altered since record
  * publication", citing <a href="https://www.rfc-editor.org/rfc/rfc5155.html#section-10.3">RFC 5155,
  * section 10.3</a>: an unverified iteration count is a field the attacker fills in, and inflating it would be a
- * one-packet downgrade of any zone.</p>
+ * one-packet downgrade of any zone.
  *
- * <h3>What it does check</h3>
- *
- * <p>Beyond the proof itself, the clarifications that exist because leaving them out is exploitable:</p>
+ * <p>Beyond the proof itself, the clarifications that exist because leaving them out is exploitable:
  * <ul>
  *   <li>An NSEC or NSEC3 record from an <em>ancestor</em> zone may not deny anything below its zone cut except a
  *   {@code DS}, and one with the {@code DNAME} bit set may not deny any subdomain of its owner (RFC 6840,
@@ -64,25 +60,23 @@ import java.util.List;
  *   {@link DnssecStatus#INSECURE} rather than {@link DnssecStatus#SECURE} (RFC 5155, sections 6 and 9.2).</li>
  * </ul>
  *
- * <h3>Bounds</h3>
- *
  * <p>Every walk here is bounded by construction rather than by a termination condition: the closest-encloser search
  * counts down the labels of the query name, and the number of records, hash computations and the wall-clock
  * deadline all come from the one {@link DnssecBudget} passed to the constructor. Exceeding any of them is
  * {@link DnssecStatus#BOGUS} and never {@link DnssecStatus#INSECURE}, because the records that drive the work come
  * from the other side of the wire and a limit breach that downgraded a zone would be a downgrade oracle rather
- * than a defence.</p>
+ * than a defence.
  *
  * <p>The shape of the bug this avoids is worth naming. hickory-dns
  * <a href="https://github.com/hickory-dns/hickory-dns/security/advisories/GHSA-3v94-mw7p-v465">GHSA-3v94-mw7p-v465</a>
  * looked for the closest encloser with a loop that stopped when the candidate equalled the {@code SOA} owner name;
  * given a response whose {@code SOA} owner is not an ancestor of the query name, the candidate walked past the root
  * and the loop never stopped. This class instead requires up front that the query name is at or below {@code zone}
- * and iterates a fixed number of times.</p>
+ * and iterates a fixed number of times.
  *
  * <p>One instance belongs to one validation and is not thread-safe, exactly like the {@link DnssecBudget} it holds.
  * Several proofs may be evaluated on one instance, which is worth doing: they share the {@code NSEC3} hash cache,
- * and the budget is spent once for a name however many proofs need it.</p>
+ * and the budget is spent once for a name however many proofs need it.
  */
 public final class DnssecDenialOfExistence {
 
@@ -124,14 +118,14 @@ public final class DnssecDenialOfExistence {
      *
      * <p>With {@code NSEC} that is an {@code NSEC} covering {@code qname} plus one covering the wildcard at the
      * closest encloser (RFC 4035, section 5.4). With {@code NSEC3} it is the closest encloser proof of RFC 5155,
-     * section 8.3 plus an {@code NSEC3} covering the wildcard at the closest encloser (section 8.4).</p>
+     * section 8.3 plus an {@code NSEC3} covering the wildcard at the closest encloser (section 8.4).
      *
      * <p>An {@code NSEC3} name error whose "next closer" name is covered by an opt-out record is
      * {@link DnssecStatus#INSECURE}: RFC 5155, section 9.2 forbids setting the {@code AD} bit on exactly this
      * response, because the covered name may still exist as an insecure delegation and the correct answer would
      * then have been a referral. The name error is still usable, it simply is not authenticated. Every proof in
      * <a href="https://www.rfc-editor.org/rfc/rfc5155.html#appendix-B">RFC 5155, appendix B</a> that rests on
-     * coverage falls in this case, because the example zone sets opt-out throughout.</p>
+     * coverage falls in this case, because the example zone sets opt-out throughout.
      *
      * @param qname   the name that does not exist
      * @param records the authenticated records of the response, from which the {@link DnsNsecRecord} and
@@ -146,7 +140,7 @@ public final class DnssecDenialOfExistence {
      * has no RRset of type {@code qtype}.
      *
      * <p>The straightforward form is an {@code NSEC} or {@code NSEC3} matching {@code qname} with the {@code QTYPE}
-     * bit clear and, per RFC 6840, section 4.3, the {@code CNAME} bit clear too. Two variants are also accepted:</p>
+     * bit clear and, per RFC 6840, section 4.3, the {@code CNAME} bit clear too. Two variants are also accepted:
      * <ul>
      *   <li>a wildcard NODATA, where {@code qname} itself does not exist but a wildcard at its closest encloser
      *   matches and has neither bit set (RFC 4035, appendix B.7 and RFC 5155, section 8.7);</li>
@@ -165,14 +159,14 @@ public final class DnssecDenialOfExistence {
      * responses a child server gives to a {@code DS} query, and they are rejected here. That is not an accusation
      * of forgery: the remedy is to ask the parent. A {@link DnssecStatus#SECURE} verdict for {@code QTYPE=DS} says
      * only that the {@code DS} RRset provably does not exist; whether that makes a delegation insecure is
-     * {@link #proveUnsignedDelegation(DnsName, List)}, which additionally requires the {@code NS} bit.</p>
+     * {@link #proveUnsignedDelegation(DnsName, List)}, which additionally requires the {@code NS} bit.
      *
      * <p>The {@code NSEC} and {@code RRSIG} bits of an {@code NSEC} record are ignored, as RFC 4035, section 5.4
      * requires, so a NODATA proof for those two types is never accepted from one. No such rule applies to
      * {@code NSEC3}, whose bitmap describes the <em>original</em> owner name, at which no {@code NSEC3} record
      * lives; the type does exist at the hashed owner name, which is what
      * <a href="https://www.rfc-editor.org/errata/eid4622">RFC 5155 erratum 4622</a> corrects section 7.2.8 to
-     * say.</p>
+     * say.
      *
      * @param qname   the name that exists
      * @param qtype   the RR type that does not exist at {@code qname}
@@ -191,7 +185,7 @@ public final class DnssecDenialOfExistence {
      * proof is an {@code NSEC} covering {@code qname} whose closest encloser is the parent of
      * {@code wildcardOwner}; with {@code NSEC3} it is an {@code NSEC3} covering the "next closer" name to
      * {@code qname} (RFC 5155, section 8.8). No record matching the closest encloser is required in the
-     * {@code NSEC3} case, and none is looked for: the wildcard answer itself proves that name exists.</p>
+     * {@code NSEC3} case, and none is looked for: the wildcard answer itself proves that name exists.
      *
      * @param qname         the queried name, which the wildcard was expanded to answer for
      * @param wildcardOwner the owner name of the wildcard RRset, {@code *} followed by the closest encloser, as the
@@ -212,17 +206,17 @@ public final class DnssecDenialOfExistence {
      * bits clear. The {@code NS} check is the one implementations forget, and without it an attacker replays an
      * NSEC or NSEC3 matching some ordinary name to claim a delegation exists where there is none, moving a signed
      * subtree out of DNSSEC's reach. The {@code SOA} check keeps the child's own apex record from being used to
-     * answer a question only the parent can answer.</p>
+     * answer a question only the parent can answer.
      *
      * <p>With {@code NSEC3} the delegation name may instead have no matching record at all, provided a closest
      * provable encloser proof is present and the "next closer" name is covered by an opt-out record (RFC 5155,
      * section 8.9). That is opt-out's sanctioned use, and it is why an opt-out zone can carry insecure delegations
-     * without an {@code NSEC3} at each one.</p>
+     * without an {@code NSEC3} at each one.
      *
      * <p>A successful proof here is {@link DnssecStatus#INSECURE}, which is the answer, not a failure:
      * {@link DnssecFailureReason#UNSIGNED_DELEGATION} and {@link DnssecFailureReason#NSEC3_OPT_OUT} are the two
      * routes to it. {@link DnssecStatus#BOGUS} means the referral was not proven insecure and must not be
-     * followed.</p>
+     * followed.
      *
      * @param childZone the owner name of the {@code NS} RRset in the authority section of the referral
      * @param records   the authenticated records of the response
@@ -507,7 +501,7 @@ public final class DnssecDenialOfExistence {
      *
      * <p>Both names in the record exist in the zone, and no name between them does. The longest ancestor of
      * {@code qname} that exists is therefore the longest name that is a suffix of {@code qname} and of the owner
-     * name: any longer ancestor of {@code qname} would have to sort inside the interval the record denies.</p>
+     * name: any longer ancestor of {@code qname} would have to sort inside the interval the record denies.
      *
      * @return the closest encloser, or {@code null} if the record is inconsistent with {@code qname} not existing
      */
@@ -634,7 +628,7 @@ public final class DnssecDenialOfExistence {
      *
      * <p>The walk is a counted {@code for} over the labels {@code qname} has below the zone apex, not a loop that
      * stops when it recognises the apex. That is the difference between this and hickory's GHSA-3v94-mw7p-v465,
-     * where an apex that was not an ancestor of the query name meant the stopping condition was never met.</p>
+     * where an apex that was not an ancestor of the query name meant the stopping condition was never met.
      */
     private ClosestEncloser closestEncloser(DnsName qname, Nsec3Set set) {
         int depth = qname.labelCount() - zone.labelCount();
@@ -915,7 +909,7 @@ public final class DnssecDenialOfExistence {
      * attacker can provoke on demand must not become a way to downgrade a zone, and that has to hold whatever a
      * shared reason code happens to say. The two agree for every reason this class produces today, which
      * {@code DnssecDenialOfExistenceTest} asserts, but a caller that switches on the reason rather than on the
-     * status is reading the diagnostic and not the verdict.</p>
+     * status is reading the diagnostic and not the verdict.
      */
     public static final class Result {
 
@@ -938,7 +932,7 @@ public final class DnssecDenialOfExistence {
          * hold but the response may still be used unauthenticated, which is the outcome for a proof that rests on
          * opt-out, for an insecure delegation, and for an {@code NSEC3} iteration count above
          * {@link DnssecLimits#maxNsec3Iterations()}. {@link DnssecStatus#BOGUS} means the response must be
-         * discarded.</p>
+         * discarded.
          */
         public DnssecStatus status() {
             return status;

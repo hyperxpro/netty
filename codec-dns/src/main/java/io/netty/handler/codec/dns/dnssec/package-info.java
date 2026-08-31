@@ -26,7 +26,7 @@
  * {@link io.netty.handler.codec.dns.dnssec.DnssecAlgorithm} and
  * {@link io.netty.handler.codec.dns.dnssec.DnssecDigestType}, whose implementation requirements follow
  * <a href="https://www.rfc-editor.org/rfc/rfc9904.html">RFC 9904</a>, as amended by
- * <a href="https://www.rfc-editor.org/rfc/rfc9906.html">RFC 9906</a>.</p>
+ * <a href="https://www.rfc-editor.org/rfc/rfc9906.html">RFC 9906</a>.
  *
  * <p>The wire half turns the DNSSEC record types into typed records:
  * {@link io.netty.handler.codec.dns.dnssec.DnsDnskeyRecord},
@@ -39,7 +39,7 @@
  * because an {@code RRSIG} covers the octets rather than the fields. Every other type is decoded into a
  * {@link io.netty.handler.codec.dns.dnssec.DefaultDnssecRawRecord} rather than being left alone, so that it too
  * carries the owner name's wire octets: an {@code RRSIG} covers ordinary types, and their canonical form starts
- * with those octets.</p>
+ * with those octets.
  *
  * <p>{@link io.netty.handler.codec.dns.dnssec.DnssecValidator} puts the two halves together and walks the chain of
  * trust from a {@link io.netty.handler.codec.dns.dnssec.DnssecTrustAnchor} down to the name that was asked about,
@@ -48,18 +48,18 @@
  * {@link io.netty.handler.codec.dns.dnssec.DnssecRecordFetcher} the caller supplies, and every query that fetcher
  * sends must carry {@code DO=1} and {@code CD=1}. The verdict comes back as a
  * {@link io.netty.handler.codec.dns.dnssec.DnssecValidationResult}, which holds no buffers and is safe to log,
- * cache and pass between threads.</p>
+ * cache and pass between threads.
  *
  * <p>The rule the engine turns on, and the one worth knowing before reading any of it: a failure to <em>prove</em>
  * security is <em>Insecure</em> or <em>Indeterminate</em>, and only a proof of <em>inconsistency</em> is
  * <em>Bogus</em>. Exceeding one of the {@link io.netty.handler.codec.dns.dnssec.DnssecLimits} is Bogus for the same
- * reason: a limit an attacker can provoke must not be a way to reach the weaker verdict.</p>
+ * reason: a limit an attacker can provoke must not be a way to reach the weaker verdict.
  *
  * <p>A <em>validating stub resolver</em> built on this package only provides real protection when the channel
  * between the stub and the recursive server it queries is itself trusted; see
  * <a href="https://www.rfc-editor.org/rfc/rfc4033.html#section-7">RFC 4033, section 7</a>. Without a secured
  * channel an attacker who can rewrite the responses can also strip the DNSSEC records and the {@code AD} bit, and
  * the stub then has nothing left to validate. Run the queries over a transport that authenticates the server, or
- * validate against a recursive server reached over a trusted link.</p>
+ * validate against a recursive server reached over a trusted link.
  */
 package io.netty.handler.codec.dns.dnssec;

@@ -22,7 +22,7 @@ import io.netty.util.internal.ObjectUtil;
  * <a href="https://www.rfc-editor.org/rfc/rfc4034.html#section-6.2">RFC 4034, Section 6.2</a>, so that no signature
  * over it can be checked.
  *
- * <p>There are two ways that happens, and {@link #reason()} says which:</p>
+ * <p>There are two ways that happens, and {@link #reason()} says which:
  * <ul>
  *   <li>{@link DnssecFailureReason#COMPRESSED_RDATA} — the {@code RDATA} holds a domain name written as a
  *   compression pointer, or as a reserved label type, or truncated. Canonical form requires every name "fully
@@ -37,11 +37,11 @@ import io.netty.util.internal.ObjectUtil;
  *
  * <p>Both reasons imply {@link DnssecStatus#BOGUS}. That is deliberate and is the conservative choice: the record
  * is being offered as authenticated data, and a validator that cannot reconstruct what was signed has no basis for
- * saying it is anything.</p>
+ * saying it is anything.
  *
  * <p>Like every other failure in this package this is a {@link io.netty.handler.codec.DecoderException}, so a
  * validator that catches {@code DecoderException} catches this alongside the
- * {@link io.netty.handler.codec.CorruptedFrameException}s the record parsers raise.</p>
+ * {@link io.netty.handler.codec.CorruptedFrameException}s the record parsers raise.
  */
 public final class DnssecCanonicalizationException extends DnssecException {
 

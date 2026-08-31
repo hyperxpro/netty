@@ -159,7 +159,7 @@ public class DnssecPublicKeysTest {
      * declare it Bogus; a limitation of the local JVM is no such proof, so the zone degrades to Insecure instead,
      * which is what RFC 4035 Section 5.2 already prescribes for anything the validator cannot process. Every
      * genuine RFC 3110 violation is caught before the KeyFactory is reached and still reports as malformed, which
-     * the surrounding tests pin down.</p>
+     * the surrounding tests pin down.
      */
     @Test
     public void testRsaExponentTheProviderRefusesIsReportedAsUnsupported() {
@@ -242,7 +242,7 @@ public class DnssecPublicKeysTest {
      *
      * <p>SunRsaSign happens to reject an exponent below 3 as well, so this assertion holds through either path. The
      * explicit check in the decoder is kept so the guarantee does not depend on which JCA provider is installed:
-     * nothing in the JCA contract requires a provider to make this check.</p>
+     * nothing in the JCA contract requires a provider to make this check.
      */
     @Test
     public void testRsaExponentBelowThreeIsRejected() {
@@ -324,7 +324,7 @@ public class DnssecPublicKeysTest {
      * (or 48) zero octets followed by y. Encoding the same point with {@code x == p} instead is a second, distinct
      * wire form of the very same key: the curve equation is computed modulo p, so {@code p} and {@code 0} satisfy it
      * identically. Two encodings mean two key tags and two DS digests for one key, which is exactly the ambiguity
-     * CVE-2023-50387 turns into an amplification primitive. The range check is what rules the second form out.</p>
+     * CVE-2023-50387 turns into an amplification primitive. The range check is what rules the second form out.
      */
     @Test
     public void testEcdsaNonCanonicalCoordinateIsRejected() {
@@ -510,12 +510,12 @@ public class DnssecPublicKeysTest {
      * in our own code.
      *
      * <p>It is also the only coverage here for algorithm 5, and its key uses the smallest exponent that is legal at
-     * all, {@code e == 3}, which sits exactly on the boundary the decoder enforces.</p>
+     * all, {@code e == 3}, which sits exactly on the boundary the decoder enforces.
      *
      * <p>The signed data is {@code RRSIG_RDATA | RR}, per
      * <a href="https://www.rfc-editor.org/rfc/rfc4034.html#section-3.1.8.1">RFC 4034, Section 3.1.8.1</a>, with the
      * RRSIG Signature field itself omitted and all names in canonical form. The names are assembled from literal
-     * octets so that this test does not depend on a name type.</p>
+     * octets so that this test does not depend on a name type.
      */
     @Test
     public void testRfc4035AppendixASoaSignatureVerifies() throws Exception {

@@ -85,6 +85,24 @@ public final class DnsRrsigRecord extends AbstractDnssecRecord {
     }
 
     /**
+     * Reuses the fields already parsed from {@code record}: re-parsing a buffer a caller has read from would
+     * fail, and {@code duplicate()} shares this record's reference count, so releasing on that failure would
+     * free a buffer this record still holds.
+     */
+    private DnsRrsigRecord(DnsRrsigRecord record, ByteBuf content) {
+        super(record.name(), record.type(), record.dnsClass(), record.timeToLive(), record.owner(), content);
+        typeCovered = record.typeCovered;
+        algorithm = record.algorithm;
+        labels = record.labels;
+        originalTtl = record.originalTtl;
+        expiration = record.expiration;
+        inception = record.inception;
+        keyTag = record.keyTag;
+        signerName = record.signerName;
+        signature = record.signature;
+    }
+
+    /**
      * Returns the RR type of the RRset this signature covers.
      */
     public DnsRecordType typeCovered() {
@@ -162,17 +180,17 @@ public final class DnsRrsigRecord extends AbstractDnssecRecord {
 
     @Override
     public DnsRrsigRecord copy() {
-        return replace(content().copy());
+        return new DnsRrsigRecord(this, content().copy());
     }
 
     @Override
     public DnsRrsigRecord duplicate() {
-        return replace(content().duplicate());
+        return new DnsRrsigRecord(this, content().duplicate());
     }
 
     @Override
     public DnsRrsigRecord retainedDuplicate() {
-        return replace(content().retainedDuplicate());
+        return new DnsRrsigRecord(this, content().retainedDuplicate());
     }
 
     @Override

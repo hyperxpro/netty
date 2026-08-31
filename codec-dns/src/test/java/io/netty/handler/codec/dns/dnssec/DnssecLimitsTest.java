@@ -39,8 +39,11 @@ public class DnssecLimitsTest {
         assertEquals(2, limits.maxDnskeysPerKeyTag());
         assertEquals(16, limits.maxDnskeysPerRrset());
         assertEquals(16, limits.maxDsRecordsPerRrset());
-        assertEquals(100, limits.maxNsec3Iterations());
-        assertEquals(500, limits.maxNsec3IterationsHardFail());
+        // Equal on purpose: RFC 9276, Section 4 names an insecure-above-100 / SERVFAIL-above-500 validator as
+        // the case to avoid, because between those points the zone is attackable as if it were unsigned.
+        assertEquals(50, limits.maxNsec3Iterations());
+        assertEquals(50, limits.maxNsec3IterationsHardFail());
+        assertEquals(limits.maxNsec3Iterations(), limits.maxNsec3IterationsHardFail());
         assertEquals(64, limits.maxNsec3HashComputations());
         assertEquals(32, limits.maxNsec3SaltLength());
         assertEquals(16, limits.maxNsecRecordsPerProof());
@@ -230,8 +233,10 @@ public class DnssecLimitsTest {
     }
 
     /**
-     * RFC 9276, Appendix A puts the "insecure" threshold below the "bogus" one; inverting them would make the
-     * softer verdict unreachable.
+     * A hard-fail threshold below the insecure one would make the softer verdict unreachable, so it is rejected.
+     * Equal values are the recommended configuration, not merely a legal one: RFC 9276, Section 4 says a validator
+     * SHOULD put both points in the same place, because a zone whose iteration count falls between them is treated
+     * as unsigned and is then open to an attacker in the middle.
      */
     @Test
     public void testNsec3HardFailMustNotBeBelowTheSoftLimit() {
@@ -243,8 +248,8 @@ public class DnssecLimitsTest {
                 .maxNsec3Iterations(100)
                 .maxNsec3IterationsHardFail(100)
                 .build());
-        assertTrue(DnssecLimits.defaults().maxNsec3IterationsHardFail()
-                > DnssecLimits.defaults().maxNsec3Iterations());
+        assertEquals(DnssecLimits.defaults().maxNsec3Iterations(),
+                DnssecLimits.defaults().maxNsec3IterationsHardFail());
     }
 
     @Test

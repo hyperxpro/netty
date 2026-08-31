@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -129,6 +130,48 @@ public class DnsNsec3ParamRecordTest {
             } finally {
                 retained.release();
             }
+        } finally {
+            record.release();
+        }
+    }
+
+    /**
+     * {@code copy}, {@code duplicate} and {@code retainedDuplicate} must keep working once a caller has read from
+     * {@code content()}, the way they do on {@code DefaultDnsRawRecord}. Routing them through {@code replace},
+     * which re-parses, made them throw on a perfectly valid record, and because {@code duplicate()} shares this
+     * record's reference count the release-on-failure then freed a live record's buffer.
+     */
+    @Test
+    public void testCopyOfAConsumedRecordKeepsTheParsedFields() {
+        DnsNsec3ParamRecord record = newRecord(DnssecTestVectors.RFC5155_NSEC3PARAM);
+        try {
+            ByteBuf content = record.content();
+            content.skipBytes(content.readableBytes());
+
+            DnsNsec3ParamRecord copy = record.copy();
+            try {
+                assertSame(DnsNsec3ParamRecord.class, copy.getClass());
+                assertArrayEquals(SALT, copy.salt());
+                assertEquals(record.iterations(), copy.iterations());
+                assertEquals(OWNER, copy.owner());
+            } finally {
+                copy.release();
+            }
+            DnsNsec3ParamRecord duplicate = record.duplicate();
+            assertSame(DnsNsec3ParamRecord.class, duplicate.getClass());
+            assertEquals(1, duplicate.hashAlgorithm());
+            assertEquals(1, record.refCnt());
+            DnsNsec3ParamRecord retained = record.retainedDuplicate();
+            try {
+                assertSame(DnsNsec3ParamRecord.class, retained.getClass());
+                assertArrayEquals(SALT, retained.salt());
+            } finally {
+                retained.release();
+            }
+
+            assertEquals(1, record.refCnt());
+            content.readerIndex(0);
+            assertArrayEquals(DnssecTestVectors.RFC5155_NSEC3PARAM, ByteBufUtil.getBytes(content));
         } finally {
             record.release();
         }

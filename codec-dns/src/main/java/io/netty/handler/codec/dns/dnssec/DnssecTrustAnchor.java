@@ -31,13 +31,13 @@ import java.util.Arrays;
  * <a href="https://www.rfc-editor.org/rfc/rfc4033.html#section-2">RFC 4033, Section 2</a>. The {@code DS} form is
  * used here because it is what IANA publishes for the root, what
  * <a href="https://www.rfc-editor.org/rfc/rfc7958.html">RFC 7958</a> distributes, and because it survives a key roll
- * that changes the key's encoding but not its digest.</p>
+ * that changes the key's encoding but not its digest.
  *
  * <p>The optional {@link #validFrom()} and {@link #validUntil()} window carries the publication and withdrawal
  * instants that the IANA trust anchor file records for each key, so that a retired anchor stops being used at the
- * right moment instead of being deleted from a list somebody has to remember to edit.</p>
+ * right moment instead of being deleted from a list somebody has to remember to edit.
  *
- * <p>Immutable, and safe to share between validations and threads.</p>
+ * <p>Immutable, and safe to share between validations and threads.
  */
 public final class DnssecTrustAnchor {
 
@@ -130,7 +130,7 @@ public final class DnssecTrustAnchor {
      *
      * <p>A hint, not an identifier: the key tag of
      * <a href="https://www.rfc-editor.org/rfc/rfc4034.html#appendix-B">RFC 4034, Appendix B</a> is a checksum and
-     * several keys may share one. It narrows the set of keys to hash; only {@link #digest()} decides.</p>
+     * several keys may share one. It narrows the set of keys to hash; only {@link #digest()} decides.
      */
     public int keyTag() {
         return keyTag;
@@ -157,7 +157,7 @@ public final class DnssecTrustAnchor {
      * Returns a copy of the expected digest of the {@code DNSKEY} RDATA.
      *
      * <p>Compare it with {@link PlatformDependent#equalsConstantTime(byte[], int, byte[], int, int)} rather than
-     * with {@link Arrays#equals(byte[], byte[])}.</p>
+     * with {@link Arrays#equals(byte[], byte[])}.
      */
     public byte[] digest() {
         return digest.clone();
@@ -229,7 +229,7 @@ public final class DnssecTrustAnchor {
      *
      * <p>The digest itself is deliberately not included, only its length: an anchor is logged wherever a validator
      * explains itself, and a full digest in a log line is noise that invites someone to compare anchors by eye
-     * instead of by {@link #equals(Object)}.</p>
+     * instead of by {@link #equals(Object)}.
      */
     @Override
     public String toString() {

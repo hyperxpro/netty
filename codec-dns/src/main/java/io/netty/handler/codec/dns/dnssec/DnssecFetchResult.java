@@ -27,14 +27,11 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.ObjectUtil;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
  * What a {@link DnssecRecordFetcher} answered with: a response code and the records of the sections a validator is
  * allowed to look at.
- *
- * <h3>Only two sections, and deliberately no AD bit</h3>
  *
  * <p>Only {@link DnsSection#ANSWER} and {@link DnsSection#AUTHORITY} are carried.
  * {@link DnsSection#ADDITIONAL} is dropped at construction rather than filtered out later: it is not authenticated
@@ -42,28 +39,22 @@ import java.util.List;
  * <a href="https://www.cve.org/CVERecord?id=CVE-2026-42960">CVE-2026-42960</a> and of
  * <a href="https://www.cve.org/CVERecord?id=CVE-2025-11411">CVE-2025-11411</a>. Discarding them up front means
  * there is no code path along which they could be consulted by accident. The {@code OPT} pseudo-record lives in
- * the additional section, so it goes with them; nothing here needs it.</p>
+ * the additional section, so it goes with them; nothing here needs it.
  *
  * <p>There is no accessor for the {@code AD} bit, and that is not an oversight. {@code AD} is the upstream
  * resolver's opinion, and a validator that has any use for it is not validating — it is believing. Exposing it
- * would only invite someone to short-circuit the chain walk with it.</p>
- *
- * <h3>Reference counting</h3>
+ * would only invite someone to short-circuit the chain walk with it.
  *
  * <p>The records are retained by the factory methods, so the caller may release the response it decoded as soon as
  * the result exists. The {@link DnssecValidator} takes ownership of every result a fetch completes with and
- * releases it exactly once, including when the validation has already finished by then.</p>
+ * releases it exactly once, including when the validation has already finished by then.
  */
 public final class DnssecFetchResult extends AbstractReferenceCounted {
 
     private final DnsResponse message;
-    private final List<DnsRecord> answers;
-    private final List<DnsRecord> authorities;
 
     private DnssecFetchResult(DnsResponse message) {
         this.message = message;
-        answers = Collections.unmodifiableList(recordsOf(message, DnsSection.ANSWER));
-        authorities = Collections.unmodifiableList(recordsOf(message, DnsSection.AUTHORITY));
     }
 
     /**
@@ -130,22 +121,6 @@ public final class DnssecFetchResult extends AbstractReferenceCounted {
         return message.code();
     }
 
-    /**
-     * Returns the answer-section records, in the order they arrived. Unmodifiable, never {@code null}, and owned by
-     * this result rather than by the caller.
-     */
-    public List<DnsRecord> answers() {
-        return answers;
-    }
-
-    /**
-     * Returns the authority-section records, in the order they arrived. Unmodifiable, never {@code null}, and owned
-     * by this result rather than by the caller.
-     */
-    public List<DnsRecord> authorities() {
-        return authorities;
-    }
-
     @Override
     public DnssecFetchResult retain() {
         super.retain();
@@ -172,8 +147,8 @@ public final class DnssecFetchResult extends AbstractReferenceCounted {
 
     @Override
     public String toString() {
-        return "DnssecFetchResult(" + responseCode() + ", " + answers.size() + " answer(s), "
-                + authorities.size() + " authority record(s))";
+        return "DnssecFetchResult(" + responseCode() + ", " + message.count(DnsSection.ANSWER)
+                + " answer(s), " + message.count(DnsSection.AUTHORITY) + " authority record(s))";
     }
 
     /**

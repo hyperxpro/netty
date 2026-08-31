@@ -454,7 +454,7 @@ public class DnssecDenialOfExistenceTest {
      * <p>The record used here is the shape that matters. Canonical order compares the rightmost label first, so an
      * NSEC owned by {@code z.aaa} whose next domain name is {@code a.zzz} spans everything in between, which is
      * most of the namespace: {@code *.example} included. Supplied alongside a genuine NSEC from the zone it turns
-     * a name error that is missing its wildcard proof into one that appears complete.</p>
+     * a name error that is missing its wildcard proof into one that appears complete.
      */
     @Test
     public void testOutOfZoneNsecIsIgnored() {

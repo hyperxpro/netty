@@ -41,14 +41,12 @@ import java.util.List;
  * <a href="https://www.rfc-editor.org/rfc/rfc4034.html#section-6.3">RFC 4034, Section 6.3</a>, and every
  * {@code original_ttl} taken from the {@code RRSIG} rather than from the TTL the records arrived with, as
  * <a href="https://www.rfc-editor.org/rfc/rfc4034.html#section-3.1.4">RFC 4034, Section 3.1.4</a> requires. A
- * received TTL has been decremented by every cache on the way and is not what the zone signed.</p>
- *
- * <h3>The downcase set and the decompress set are different sets</h3>
+ * received TTL has been decremented by every cache on the way and is not what the zone signed.
  *
  * <p>Item 2 of <a href="https://www.rfc-editor.org/rfc/rfc4034.html#section-6.2">RFC 4034, Section 6.2</a> downcases
  * the <em>owner</em> name of every record whatever its type. Item 3 downcases the domain names inside the
  * {@code RDATA} of a listed set of types, and that list has two published errors, both corrected by
- * <a href="https://www.rfc-editor.org/rfc/rfc6840.html#section-5.1">RFC 6840, Section 5.1</a>:</p>
+ * <a href="https://www.rfc-editor.org/rfc/rfc6840.html#section-5.1">RFC 6840, Section 5.1</a>:
  * <ul>
  *   <li><strong>{@code NSEC} is not downcased</strong>, although Section 6.2 lists it. {@code RRSIG} is. Getting
  *   this pair backwards is the classic canonicalisation bug and it is invisible to any test written in lower case,
@@ -64,7 +62,7 @@ import java.util.List;
  *
  * <p>No type standardised after <a href="https://www.rfc-editor.org/rfc/rfc3597.html#section-7">RFC 3597,
  * Section 7</a> is ever downcased, so the {@code TargetName} of {@code SVCB} and {@code HTTPS}, and the contents of
- * {@code TLSA}, {@code SMIMEA} and {@code CAA}, are passed through untouched. The list is closed, not open.</p>
+ * {@code TLSA}, {@code SMIMEA} and {@code CAA}, are passed through untouched. The list is closed, not open.
  *
  * <p>Decompression is a separate question with a separate answer, and this class refuses rather than guesses:
  * {@code RDATA} holding a compression pointer is rejected with
@@ -73,16 +71,14 @@ import java.util.List;
  * pointer refers to is not available here in any case. Three asymmetries are worth holding on to: {@code RRSIG} is
  * downcased but never compressed, {@code NSEC} is neither, and {@code KX}, {@code A6} and {@code DNAME} are
  * downcased but never compressed. Both sets, and the field positions they share, are held once in
- * {@link DnssecRdataLayout}, which {@link DnssecRdataDecompressor} reads as well.</p>
- *
- * <h3>Memory</h3>
+ * {@link DnssecRdataLayout}, which {@link DnssecRdataDecompressor} reads as well.
  *
  * <p>{@link #signedData(ByteBufAllocator, DnsRrsigRecord, DnsRRset)} allocates one buffer per call, of exactly the
  * size the answer needs, and the caller releases it. There is deliberately no shared scratch buffer to grow or
  * shrink: Unbound's <a href="https://www.cve.org/CVERecord?id=CVE-2026-56416">CVE-2026-56416</a> was a heap
- * overflow reachable precisely because its canonicalisation walked one.</p>
+ * overflow reachable precisely because its canonicalisation walked one.
  *
- * <p>This class is stateless and thread-safe.</p>
+ * <p>This class is stateless and thread-safe.
  */
 public final class DnssecCanonicalizer {
 
@@ -112,9 +108,9 @@ public final class DnssecCanonicalizer {
      * RFC 6840, Section 5.1.
      *
      * <p>Notably {@code false} for {@code NSEC} and {@code HINFO}, and for every type standardised after RFC 3597.
-     * The owner name is downcased for every type and is not covered by this method.</p>
+     * The owner name is downcased for every type and is not covered by this method.
      */
-    public static boolean downcasesRdataNames(DnsRecordType type) {
+    static boolean downcasesRdataNames(DnsRecordType type) {
         return DnssecRdataLayout.downcasesNames(ObjectUtil.checkNotNull(type, "type"));
     }
 
@@ -124,7 +120,7 @@ public final class DnssecCanonicalizer {
      *
      * <p><a href="https://www.rfc-editor.org/rfc/rfc4034.html#section-3.1.3">RFC 4034, Section 3.1.3</a>: the
      * Labels field "MUST NOT count either the null (root) label that terminates the owner name or the wildcard
-     * label (if present)". {@link DnsName#labelCount()} already excludes the root.</p>
+     * label (if present)". {@link DnsName#labelCount()} already excludes the root.
      */
     public static int ownerLabelCount(DnsName owner) {
         int labels = ObjectUtil.checkNotNull(owner, "owner").labelCount();
@@ -140,9 +136,9 @@ public final class DnssecCanonicalizer {
      *
      * <p>A caller that gets {@code true} back has more work to do: RFC 4035, Section 5.3.4 requires it to also
      * obtain a denial-of-existence proof that the queried name itself does not exist, because otherwise a valid
-     * wildcard signature could be replayed over a name the zone answers explicitly.</p>
+     * wildcard signature could be replayed over a name the zone answers explicitly.
      */
-    public static boolean isWildcardExpansion(DnsRrsigRecord rrsig, DnsName owner) {
+    static boolean isWildcardExpansion(DnsRrsigRecord rrsig, DnsName owner) {
         ObjectUtil.checkNotNull(rrsig, "rrsig");
         return rrsig.labels() < ownerLabelCount(owner);
     }
@@ -154,7 +150,7 @@ public final class DnssecCanonicalizer {
      * wildcard.
      *
      * <p>The returned name is not downcased; {@link #signedData(ByteBufAllocator, DnsRrsigRecord, DnsRRset)} does
-     * that. Callers that only want to know which name was signed usually want it as it is.</p>
+     * that. Callers that only want to know which name was signed usually want it as it is.
      *
      * @throws IllegalArgumentException if the Labels field exceeds {@link #ownerLabelCount(DnsName)}, which RFC
      *                                  4035, Section 5.3.2 says means "the RRSIG RR did not pass the necessary
@@ -189,7 +185,7 @@ public final class DnssecCanonicalizer {
      * @throws DnssecCanonicalizationException if the {@code RDATA} of a type whose names are downcased holds a
      *                                         compression pointer, a reserved label type, or a truncated name.
      */
-    public static void writeCanonicalRdata(DnsRecordType type, ByteBuf rdata, ByteBuf out) {
+    static void writeCanonicalRdata(DnsRecordType type, ByteBuf rdata, ByteBuf out) {
         ObjectUtil.checkNotNull(out, "out").writeBytes(canonicalRdata(type, rdata));
     }
 
@@ -199,7 +195,7 @@ public final class DnssecCanonicalizer {
      * <p>This performs no validation: it does not check that the {@code RRSIG} covers the RRset, that it is in its
      * validity period or that a key exists for it. Those are {@link DnssecSignatureVerifier}'s job and it does them
      * all before calling this, so that no attacker-controlled record reaches the canonicaliser without having been
-     * judged first.</p>
+     * judged first.
      *
      * @param alloc the allocator for the returned buffer.
      * @param rrsig the signature whose preimage is wanted.

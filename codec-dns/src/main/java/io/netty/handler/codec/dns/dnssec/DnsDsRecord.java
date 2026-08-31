@@ -72,6 +72,19 @@ public final class DnsDsRecord extends AbstractDnssecRecord {
     }
 
     /**
+     * Reuses the fields already parsed from {@code record}: re-parsing a buffer a caller has read from would
+     * fail, and {@code duplicate()} shares this record's reference count, so releasing on that failure would
+     * free a buffer this record still holds.
+     */
+    private DnsDsRecord(DnsDsRecord record, ByteBuf content) {
+        super(record.name(), record.type(), record.dnsClass(), record.timeToLive(), record.owner(), content);
+        keyTag = record.keyTag;
+        algorithm = record.algorithm;
+        digestType = record.digestType;
+        digest = record.digest;
+    }
+
+    /**
      * Returns the key tag of the {@code DNSKEY} this record refers to. It is only a hint: RFC 4034, appendix B
      * warns that key tags are not unique, so a validator must try every key whose tag and algorithm match.
      */
@@ -105,17 +118,17 @@ public final class DnsDsRecord extends AbstractDnssecRecord {
 
     @Override
     public DnsDsRecord copy() {
-        return replace(content().copy());
+        return new DnsDsRecord(this, content().copy());
     }
 
     @Override
     public DnsDsRecord duplicate() {
-        return replace(content().duplicate());
+        return new DnsDsRecord(this, content().duplicate());
     }
 
     @Override
     public DnsDsRecord retainedDuplicate() {
-        return replace(content().retainedDuplicate());
+        return new DnsDsRecord(this, content().retainedDuplicate());
     }
 
     @Override

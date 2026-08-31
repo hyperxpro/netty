@@ -25,7 +25,7 @@ import java.security.Signature;
  * <p>DNSSEC and the JCA disagree about signature framing for both remaining signature families, and in both cases
  * the disagreement is silent: feeding the wire bytes straight to {@link Signature#verify(byte[])} does not raise a
  * decoding error, it either throws a length exception or simply returns {@code false}, which a validator would
- * report as <em>Bogus</em>. The conversions here are what make an otherwise valid signature verify.</p>
+ * report as <em>Bogus</em>. The conversions here are what make an otherwise valid signature verify.
  */
 public final class DnssecSignatures {
 
@@ -36,7 +36,7 @@ public final class DnssecSignatures {
      * (32 octets) and P-384 (48). Bounding the input here is what guarantees the DER SEQUENCE below never exceeds
      * 127 content octets, so the short-form length encoding always suffices and no long-form path is needed. A curve
      * with larger coordinates, such as P-521, would break that guarantee, and rejecting it outright is safer than
-     * emitting silently malformed DER.</p>
+     * emitting silently malformed DER.
      */
     private static final int MAXIMUM_ECDSA_HALF_LENGTH = 48;
 
@@ -52,7 +52,7 @@ public final class DnssecSignatures {
      * <p><a href="https://www.rfc-editor.org/rfc/rfc6605.html#section-4">RFC 6605, Section 4</a> carries the two
      * signature integers as the fixed-width concatenation {@code r || s}, each padded to the coordinate size of the
      * curve. The JCA {@code SHA256withECDSA} and {@code SHA384withECDSA} signatures instead expect
-     * {@code SEQUENCE { INTEGER r, INTEGER s }}, whose INTEGERs are minimally encoded and signed.</p>
+     * {@code SEQUENCE { INTEGER r, INTEGER s }}, whose INTEGERs are minimally encoded and signed.
      *
      * @param rawRS      the {@code r || s} value from the {@code RRSIG} Signature field. Never modified.
      * @param halfLength the width of each integer: 32 for {@link DnssecAlgorithm#ECDSAP256SHA256}, 48 for
@@ -135,7 +135,7 @@ public final class DnssecSignatures {
      * signature that is longer, or a stripped one that is shorter, than the modulus. {@code SunRsaSign} accepts
      * neither: any length other than the modulus length fails with
      * {@code SignatureException: Bad signature length}, before the signature is even examined. Left-padding to the
-     * modulus length is therefore required for interoperability, not an optimisation.</p>
+     * modulus length is therefore required for interoperability, not an optimisation.
      *
      * @param signature          the {@code RRSIG} Signature field. Never modified.
      * @param modulusLengthBytes the length of the signer's RSA modulus in octets, that is

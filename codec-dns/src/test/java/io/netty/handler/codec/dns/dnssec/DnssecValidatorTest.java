@@ -39,6 +39,8 @@ import java.util.concurrent.TimeUnit;
 import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.A;
 import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.DNSKEY;
 import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.DS;
+import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.EXPIRATION;
+import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.INCEPTION;
 import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.InMemoryFetcher;
 import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.MX;
 import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.NS;
@@ -49,6 +51,7 @@ import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.TestZone;
 import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.a;
 import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.cname;
 import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.list;
+import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.ns;
 import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.nsec;
 import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.nsec3;
 import static io.netty.handler.codec.dns.dnssec.DnssecChainTestSupport.response;
@@ -66,7 +69,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Two sources of signed data are used. The RFC 4035 appendix A zone is real — its {@code RRSIG}s verify
  * cryptographically against the published key — and it carries the end-to-end chain from a trust anchor through a
  * key-signing key to an answer. Everything the RFC does not publish, which is anything needing a private key, is
- * signed by {@link DnssecChainTestSupport} over freshly generated ECDSA P-256 zones.</p>
+ * signed by {@link DnssecChainTestSupport} over freshly generated ECDSA P-256 zones.
  */
 public class DnssecValidatorTest {
 
@@ -124,7 +127,7 @@ public class DnssecValidatorTest {
      * signature made by the zone-signing key 38519, and the anchor names the key-signing key 9465. Both signatures
      * are genuine and both verify cryptographically, so a validator that accepts the RRset because <em>some</em>
      * key in it matched the anchor gets Secure here. There is no such thing as a valid chain through 38519,
-     * because nothing outside the zone vouches for it.</p>
+     * because nothing outside the zone vouches for it.
      */
     @Test
     public void testAnchorMatchingOneKeyDoesNotTrustASignatureMadeByAnother() {
@@ -219,6 +222,31 @@ public class DnssecValidatorTest {
 
         assertTrue(future.isDone());
         assertEquals(DnssecStatus.SECURE, future.getNow().status(), String.valueOf(future.getNow()));
+    }
+
+    /**
+     * Cancelling was never honoured — the walk ran on and the verdict was published into a promise that had
+     * already been failed — so the future says so rather than accepting a cancellation it will not act on.
+     */
+    @Test
+    public void testTheReturnedFutureCannotBeCancelled() {
+        Rfc4035Zone zone = new Rfc4035Zone(new DefaultEventExecutor());
+        DnssecValidator validator = zone.validator(zone.fetcher(zone.dnskeyAnswer(zone.rrsigDnskeyByKsk())));
+        DefaultDnsResponse response = response("ai.example.", DnsRecordType.A, DnsResponseCode.NOERROR,
+                list(zone.aiA(), zone.rrsigAiA()), zone.aiNsecProof());
+        Future<DnssecValidationResult> future;
+        try {
+            future = validator.validate(DnsName.fromString("ai.example."), DnsRecordType.A, response, zone.loop);
+        } finally {
+            response.release();
+        }
+        try {
+            assertFalse(future.cancel(true));
+            assertFalse(future.isCancelled());
+            assertEquals(DnssecStatus.SECURE, future.awaitUninterruptibly().getNow().status());
+        } finally {
+            zone.loop.shutdownGracefully(0, 0, TimeUnit.SECONDS).awaitUninterruptibly();
+        }
     }
 
     /**
@@ -486,6 +514,141 @@ public class DnssecValidatorTest {
         assertEquals(DnssecFailureReason.BAILIWICK_VIOLATION, result.reason());
     }
 
+    /**
+     * A {@code DS} RRset cannot be synthesised from a wildcard —
+     * <a href="https://www.rfc-editor.org/rfc/rfc4592.html#section-4.2">RFC 4592, Section 4.2</a> — so a
+     * wildcard-expanded signature over one covers a name the parent never delegated. The owner name in the message
+     * is not what the signature commits to, so one such signature authenticates a delegation at any name the
+     * attacker cares to put in front of it.
+     */
+    @Test
+    public void testWildcardExpandedDsDoesNotEstablishADelegation() {
+        TestZone parent = new TestZone("example.");
+        TestZone rogue = new TestZone("evil.example.");
+        InMemoryFetcher fetcher = new InMemoryFetcher(executor);
+        putDnskey(fetcher, parent);
+        putDnskey(fetcher, rogue);
+
+        // Signed with Labels 1 against a two-label owner, so the signature covers *.example. and not evil.example.
+        DnsDsRecord ds = keep(parent.delegationTo(rogue, DnssecDigestType.SHA256));
+        fetcher.put(rogue.name, DnsRecordType.DS, DnsResponseCode.NOERROR,
+                list(ds, keep(parent.sign(list((DnssecRecord) ds), 1))), Collections.<DnsRecord>emptyList());
+
+        DnssecRecord answer = keep(a("evil.example.", "192.0.2.66"));
+        DnssecValidationResult result = validate(parent, fetcher, "evil.example.", DnsRecordType.A,
+                response("evil.example.", DnsRecordType.A, DnsResponseCode.NOERROR,
+                        list(answer, keep(rogue.sign(list(answer)))), Collections.<DnsRecord>emptyList()));
+
+        assertEquals(DnssecStatus.BOGUS, result.status(), result.toString());
+        assertTrue(result.message().contains("wildcard"), result.message());
+    }
+
+    // -----------------------------------------------------------------------------------------------------------
+    // Parent-side data
+
+    /**
+     * A {@code DS} RRset lives in the parent zone and is signed by the parent, see
+     * <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-5.2">RFC 4035, Section 5.2</a> and
+     * <a href="https://www.rfc-editor.org/rfc/rfc4034.html#section-5">RFC 4034, Section 5</a>. So the walk for a
+     * {@code DS} query stops above the cut at the name that was asked about.
+     */
+    @Test
+    public void testDsQueryIsAuthenticatedByTheParentZone() {
+        TestZone parent = new TestZone("example.");
+        TestZone child = new TestZone("sub.example.");
+        InMemoryFetcher fetcher = new InMemoryFetcher(executor);
+        putDnskey(fetcher, parent);
+
+        DnsDsRecord ds = keep(parent.delegationTo(child, DnssecDigestType.SHA256));
+        DnssecValidationResult result = validate(parent, fetcher, "sub.example.", DnsRecordType.DS,
+                response("sub.example.", DnsRecordType.DS, DnsResponseCode.NOERROR,
+                        list(ds, keep(parent.sign(list((DnssecRecord) ds)))), Collections.<DnsRecord>emptyList()));
+
+        assertEquals(DnssecStatus.SECURE, result.status(), result.toString());
+        assertEquals(parent.name, result.signerName());
+        // Nothing below example. is ever looked up, because the child has no say in its own delegation.
+        assertEquals(list("example. " + DnsRecordType.DNSKEY), fetcher.queries());
+    }
+
+    /**
+     * The reason the walk must stop there: a validator that descends through the cut verifies the {@code DS} with
+     * the child's keys, so a rogue child can publish a {@code DS} for itself naming whatever key it likes and
+     * mint the parent-to-child link the whole chain exists to establish.
+     */
+    @Test
+    public void testChildMayNotSignItsOwnDsRrset() {
+        TestZone parent = new TestZone("example.");
+        TestZone child = new TestZone("sub.example.");
+        TestZone rogue = new TestZone("sub.example.");
+        InMemoryFetcher fetcher = new InMemoryFetcher(executor);
+        putDnskey(fetcher, parent);
+        putDnskey(fetcher, child);
+        putSignedDelegation(fetcher, parent, child);
+
+        // A DS for sub.example. naming a key the parent never vouched for, signed by sub.example. itself.
+        DnsDsRecord forged = keep(parent.delegationTo(rogue, DnssecDigestType.SHA256));
+        DnssecValidationResult result = validate(parent, fetcher, "sub.example.", DnsRecordType.DS,
+                response("sub.example.", DnsRecordType.DS, DnsResponseCode.NOERROR,
+                        list(forged, keep(child.sign(list((DnssecRecord) forged)))),
+                        Collections.<DnsRecord>emptyList()));
+
+        assertEquals(DnssecStatus.BOGUS, result.status(), result.toString());
+        assertEquals(DnssecFailureReason.KEY_TAG_NO_MATCH, result.reason());
+        assertTrue(result.message().contains("keys of example."), result.message());
+    }
+
+    // -----------------------------------------------------------------------------------------------------------
+    // Referrals
+
+    /**
+     * A referral says something about the names below the delegation it carries and nothing about anything else.
+     * Here the walk has already established that {@code a.example.} is an ordinary name inside the signed zone,
+     * and a genuine, publicly fetchable {@code NSEC} for an unsigned delegation on a different branch is replayed
+     * into the authority section. Reporting Insecure for {@code a.example.} on the strength of it is a downgrade:
+     * an application reads Insecure as "unsigned" and takes whatever the attacker sends next. This is the
+     * relevance class of dnsjava's <a href="https://www.cve.org/CVERecord?id=CVE-2024-25638">CVE-2024-25638</a>.
+     */
+    @Test
+    public void testReferralForAnUnrelatedNameDoesNotDowngradeTheAnswer() {
+        TestZone zone = new TestZone("example.");
+        InMemoryFetcher fetcher = new InMemoryFetcher(executor);
+        putDnskey(fetcher, zone);
+        putNoDelegation(fetcher, zone, "a.example.", "b.example.", A, RRSIG, NSEC);
+
+        DnsNsecRecord elsewhere = keep(nsec("sub.example.", "zz.example.", NS, RRSIG, NSEC));
+        DnssecValidationResult result = validate(zone, fetcher, "a.example.", DnsRecordType.A,
+                response("a.example.", DnsRecordType.A, DnsResponseCode.NOERROR,
+                        Collections.<DnsRecord>emptyList(),
+                        list(keep(ns("sub.example.", "ns1.attacker.")), elsewhere,
+                                keep(zone.sign(list(elsewhere))))));
+
+        assertEquals(DnssecStatus.BOGUS, result.status(), result.toString());
+        assertNull(result.insecureDelegation());
+    }
+
+    /**
+     * The control, and the one shape that reaches a referral legitimately: a {@code DS} query is answered by the
+     * parent, so the walk stops above the cut and never probes it itself. An authenticated denial of the
+     * {@code DS} for the very name that was asked about is a real statement about it.
+     */
+    @Test
+    public void testReferralAtTheNameThatWasAskedAboutIsHonoured() {
+        TestZone zone = new TestZone("example.");
+        InMemoryFetcher fetcher = new InMemoryFetcher(executor);
+        putDnskey(fetcher, zone);
+
+        DnsNsecRecord unsigned = keep(nsec("sub.example.", "zz.example.", NS, RRSIG, NSEC));
+        DnssecValidationResult result = validate(zone, fetcher, "sub.example.", DnsRecordType.DS,
+                response("sub.example.", DnsRecordType.DS, DnsResponseCode.NOERROR,
+                        Collections.<DnsRecord>emptyList(),
+                        list(keep(ns("sub.example.", "ns1.sub.example.")), unsigned,
+                                keep(zone.sign(list(unsigned))))));
+
+        assertEquals(DnssecStatus.INSECURE, result.status(), result.toString());
+        assertEquals(DnssecFailureReason.UNSIGNED_DELEGATION, result.reason());
+        assertEquals(DnsName.fromString("sub.example."), result.insecureDelegation());
+    }
+
     // -----------------------------------------------------------------------------------------------------------
     // Wildcards
 
@@ -523,6 +686,39 @@ public class DnssecValidatorTest {
 
         assertEquals(DnssecStatus.BOGUS, result.status(), result.toString());
         assertEquals(DnssecFailureReason.BAILIWICK_VIOLATION, result.reason());
+    }
+
+    /**
+     * <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-5.4">RFC 4035, Section 5.4</a>: an {@code NSEC}
+     * proves that wildcard expansion could not have been used only when its owner name has as many labels as the
+     * Labels field of the {@code RRSIG} covering it. A zone with a wildcard publishes an {@code NSEC} at
+     * {@code *.example.}, whose signature therefore covers the name {@code *.example.} and not the owner name in
+     * the message — so the same signature and the same RDATA verify under any owner inside the zone. Re-owning it
+     * turns one genuine record into an authenticated denial for a name of the attacker's choosing.
+     */
+    @Test
+    public void testWildcardExpandedNsecIsNotADenialOfExistenceProof() {
+        TestZone zone = new TestZone("example.");
+        InMemoryFetcher fetcher = new InMemoryFetcher(executor);
+        putDnskey(fetcher, zone);
+        // The walk's own DS probe: bank.example. is an ordinary name in the zone, and it really does have an MX.
+        putNoDelegation(fetcher, zone, "bank.example.", "www.example.", A, MX, RRSIG, NSEC);
+
+        DnsNsecRecord wildcard = keep(nsec("*.example.", "www.example.", A, RRSIG, NSEC));
+        DnsRrsigRecord signature = keep(zone.sign(list(wildcard)));
+        assertEquals(1, signature.labels());
+
+        // The forgery: the zone's own signature, verbatim, over the same RDATA under a name of the attacker's
+        // choosing. The type bit map has no MX, so it answers NODATA for a name whose MX exists.
+        DnsNsecRecord reOwned = keep(nsec("bank.example.", "www.example.", A, RRSIG, NSEC));
+        DnssecValidationResult result = validate(zone, fetcher, "bank.example.", DnsRecordType.MX,
+                response("bank.example.", DnsRecordType.MX, DnsResponseCode.NOERROR,
+                        Collections.<DnsRecord>emptyList(),
+                        list(reOwned, keep(reOwn(signature, "bank.example.")))));
+
+        assertEquals(DnssecStatus.BOGUS, result.status(), result.toString());
+        assertEquals(DnssecFailureReason.DNSSEC_BOGUS, result.reason());
+        assertTrue(result.message().contains("wildcard"), result.message());
     }
 
     // -----------------------------------------------------------------------------------------------------------
@@ -631,6 +827,48 @@ public class DnssecValidatorTest {
 
         assertEquals(DnssecStatus.BOGUS, result.status(), result.toString());
         assertEquals(DnssecFailureReason.RRSIGS_MISSING, result.reason());
+    }
+
+    // -----------------------------------------------------------------------------------------------------------
+    // Algorithm downgrade
+
+    /**
+     * <a href="https://www.rfc-editor.org/rfc/rfc6840.html#section-5.2">RFC 6840, Section 5.2</a> treats a zone
+     * this build can evaluate <em>nothing</em> of as unsigned. It does not licence treating one RRset as unsigned
+     * because the {@code RRSIG} left on it happens to name an algorithm this build cannot evaluate. The zone here
+     * is mid-rollover and its ECDSA key signs everything, so an answer that does not validate against it is Bogus
+     * — otherwise discarding the signatures made with the algorithm the validator implements would strip DNSSEC
+     * from every multi-algorithm zone.
+     */
+    @Test
+    public void testAnswerCarryingOnlyAnUnevaluatableRrsigIsBogus() {
+        RolloverZone fixture = new RolloverZone();
+        DnssecRecord answer = keep(a("www.example.", "192.0.2.66"));
+        DnssecValidationResult result = fixture.validate(DnsRecordType.A,
+                list((DnsRecord) answer, keep(fixture.unevaluatableRrsig("www.example.", DnsRecordType.A))),
+                Collections.<DnsRecord>emptyList());
+
+        assertEquals(DnssecStatus.BOGUS, result.status(), result.toString());
+        assertEquals(DnssecFailureReason.DNSSEC_BOGUS, result.reason());
+        assertNull(result.insecureDelegation());
+    }
+
+    /**
+     * The same lever on the negative path, where the reason travels a longer way: the proof records are verified
+     * by {@code collectProof}, which remembers why one was rejected, and the verdict is reported with that reason.
+     * A reason meaning "could not evaluate" must not become the status of a zone the chain has already proven
+     * secure.
+     */
+    @Test
+    public void testDenialCarryingOnlyAnUnevaluatableRrsigIsBogus() {
+        RolloverZone fixture = new RolloverZone();
+        DnsNsecRecord proof = keep(nsec("www.example.", "zz.example.", A, RRSIG, NSEC));
+        DnssecValidationResult result = fixture.validate(DnsRecordType.MX, Collections.<DnsRecord>emptyList(),
+                list(proof, keep(fixture.unevaluatableRrsig("www.example.", DnsRecordType.NSEC))));
+
+        assertEquals(DnssecStatus.BOGUS, result.status(), result.toString());
+        assertEquals(DnssecFailureReason.DNSSEC_BOGUS, result.reason());
+        assertNull(result.insecureDelegation());
     }
 
     // -----------------------------------------------------------------------------------------------------------
@@ -860,6 +1098,17 @@ public class DnssecValidatorTest {
                 .hash(DnsName.fromString(name), DnsNsec3Hasher.HASH_ALGORITHM_SHA1, NSEC3_ITERATIONS, NSEC3_SALT);
     }
 
+    /**
+     * The same {@code RRSIG} under a different owner name. RFC 4035, Section 5.3.2 rebuilds the owner the
+     * signature covers from the Labels field, so the owner in the message is not part of what was signed and
+     * re-owning one costs an attacker nothing.
+     */
+    private static DnsRrsigRecord reOwn(DnsRrsigRecord rrsig, String owner) {
+        return DnssecRRsetFixtures.rrsig(DnsName.fromString(owner), rrsig.typeCovered(), rrsig.algorithm(),
+                rrsig.labels(), rrsig.originalTtl(), rrsig.expiration(), rrsig.inception(), rrsig.keyTag(),
+                rrsig.signerName().toWireBytes(), rrsig.signature());
+    }
+
     private void putDnskey(InMemoryFetcher fetcher, TestZone zone) {
         List<DnssecRecord> keys = list((DnssecRecord) zone.dnskey);
         fetcher.put(zone.name, DnsRecordType.DNSKEY, DnsResponseCode.NOERROR,
@@ -963,6 +1212,39 @@ public class DnssecValidatorTest {
             long value = now;
             now += step;
             return value;
+        }
+    }
+
+    /**
+     * A zone midway through an algorithm rollover: an ECDSA key that the trust anchor vouches for and that signs
+     * everything, and a second key whose algorithm this build cannot evaluate. Both are authenticated, because the
+     * {@code DNSKEY} RRset is signed as a whole, so an {@code RRSIG} naming the second one gets past the RFC 6840,
+     * Section 5.12 check and reaches the point where the algorithm is found unusable.
+     */
+    private final class RolloverZone {
+
+        private final TestZone zone = new TestZone("example.");
+        private final InMemoryFetcher fetcher = new InMemoryFetcher(executor);
+        private final DnsDnskeyRecord rollover =
+                keep(DnssecRRsetFixtures.dnskey(zone.name, 256, 3, DnssecAlgorithm.DSA, "AQID"));
+
+        RolloverZone() {
+            assertFalse(DnssecAlgorithm.DSA.isSupported());
+            List<DnssecRecord> keys = list((DnssecRecord) zone.dnskey, rollover);
+            fetcher.put(zone.name, DnsRecordType.DNSKEY, DnsResponseCode.NOERROR,
+                    list(zone.dnskey, rollover, keep(zone.sign(keys))), Collections.<DnsRecord>emptyList());
+            putNoDelegation(fetcher, zone, "www.example.", "zz.example.", A, RRSIG, NSEC);
+        }
+
+        /** An {@code RRSIG} naming the unevaluatable key. Its signature is never reached, so it need not be real. */
+        DnsRrsigRecord unevaluatableRrsig(String owner, DnsRecordType typeCovered) {
+            return DnssecRRsetFixtures.rrsig(DnsName.fromString(owner), typeCovered, DnssecAlgorithm.DSA, 2, 3600,
+                    EXPIRATION, INCEPTION, rollover.keyTag(), zone.name.toWireBytes(), new byte[] { 1, 2, 3, 4 });
+        }
+
+        DnssecValidationResult validate(DnsRecordType qtype, List<DnsRecord> answer, List<DnsRecord> authority) {
+            return DnssecValidatorTest.this.validate(zone, fetcher, "www.example.", qtype,
+                    response("www.example.", qtype, DnsResponseCode.NOERROR, answer, authority));
         }
     }
 

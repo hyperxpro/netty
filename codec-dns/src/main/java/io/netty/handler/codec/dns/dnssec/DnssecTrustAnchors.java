@@ -32,9 +32,9 @@ import java.util.Set;
  * <p>Lookup follows the DNS tree: {@link #anchorsFor(DnsName)} returns the anchors configured at the deepest
  * ancestor-or-equal name that has any, so an anchor installed for {@code example.com} takes precedence over one for
  * the root when validating {@code www.example.com}, which is how an island of security or a private zone is
- * configured alongside the public root.</p>
+ * configured alongside the public root.
  *
- * <p>Immutable, and safe to share between validations and threads.</p>
+ * <p>Immutable, and safe to share between validations and threads.
  */
 public final class DnssecTrustAnchors {
 
@@ -76,22 +76,22 @@ public final class DnssecTrustAnchors {
      * <a href="https://www.rfc-editor.org/rfc/rfc7958.html">RFC 7958</a> defines for the IANA file, and its release
      * cadence has nothing to do with the root key's. The list here is a convenience for getting started and a
      * cross-check against a locally provisioned file, and treating it as authoritative puts the root of your chain
-     * of trust on a library upgrade schedule.</p>
+     * of trust on a library upgrade schedule.
      *
      * <p><strong>The root key is being rolled, and this list has a date on it.</strong> The root zone has been
      * signed by both keys during the overlap, but <strong>from 2026-10-11 it is signed exclusively by KSK-2024, key
      * tag 38696</strong>. A deployment pinned to KSK-2017 alone fails <em>every</em> validation from that date, and
      * the failure is {@link DnssecStatus#BOGUS}, so it is a total resolution outage rather than a quiet degradation.
-     * Both keys are present here for exactly that reason.</p>
+     * Both keys are present here for exactly that reason.
      *
      * <p>An operator who cannot ship a Netty upgrade on the root's schedule should not be using this method. Supply
      * your own anchors from a file you control, refreshed from IANA or maintained by
      * <a href="https://www.rfc-editor.org/rfc/rfc5011.html">RFC 5011</a> automated updates, and use
-     * {@link #newBuilder()}.</p>
+     * {@link #newBuilder()}.
      *
      * <p>The retired KSK-2010, key tag 19036, is deliberately absent: it was withdrawn on 2019-01-11 and an anchor
      * that can no longer validate anything is only a way to keep a dead key alive in configurations that copy this
-     * list.</p>
+     * list.
      */
     public static DnssecTrustAnchors iana() {
         return IANA;
@@ -132,7 +132,7 @@ public final class DnssecTrustAnchors {
      *
      * <p>{@code null} rather than an empty result on purpose: "which zone is this name's trust anchor at" and
      * "there is no trust anchor for this name" are different answers, and the second one is
-     * {@link DnssecStatus#INDETERMINATE}.</p>
+     * {@link DnssecStatus#INDETERMINATE}.
      *
      * @param name the name being validated.
      */
@@ -157,12 +157,12 @@ public final class DnssecTrustAnchors {
      * <p>Only the deepest name's anchors are returned; anchors at a shallower name are not merged in. An anchor
      * configured for a name is a statement that the chain of trust for that subtree starts there, and quietly
      * falling back to the root would let a validator get a <em>Secure</em> answer through a chain the operator
-     * deliberately overrode.</p>
+     * deliberately overrode.
      *
      * <p>The result is <em>not</em> filtered by {@link DnssecTrustAnchor#isValidAt(long)}. Anchors have publication
      * and withdrawal dates, so a caller must apply its own validation clock before using one; leaving that here
      * would mean either taking a clock the caller has not supplied or silently making the answer depend on the
-     * system time.</p>
+     * system time.
      *
      * @param name the name being validated.
      */
@@ -184,7 +184,7 @@ public final class DnssecTrustAnchors {
      * {@link DnssecTrustAnchor#equals(Object) equals} one already added is a no-op rather than an error, so merging
      * two overlapping sources does not duplicate work at validation time.
      *
-     * <p>Not thread-safe; build the instance on one thread and share the result, which is immutable.</p>
+     * <p>Not thread-safe; build the instance on one thread and share the result, which is immutable.
      */
     public static final class Builder {
 

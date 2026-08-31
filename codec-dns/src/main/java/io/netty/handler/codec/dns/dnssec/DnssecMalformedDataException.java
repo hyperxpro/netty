@@ -21,7 +21,7 @@ package io.netty.handler.codec.dns.dnssec;
  * length cannot be reconciled with the key that is supposed to have produced it.
  *
  * <p>Unlike {@link DnssecUnsupportedAlgorithmException} this is a hard failure: the data is wrong, not merely
- * unrecognised, so a validator must not downgrade to <em>Insecure</em> because of it.</p>
+ * unrecognised, so a validator must not downgrade to <em>Insecure</em> because of it.
  */
 public final class DnssecMalformedDataException extends DnssecException {
 

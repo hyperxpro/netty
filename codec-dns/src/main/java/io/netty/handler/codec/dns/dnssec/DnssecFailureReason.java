@@ -24,10 +24,10 @@ package io.netty.handler.codec.dns.dnssec;
  * DNS Error Codes</a> registry of <a href="https://www.rfc-editor.org/rfc/rfc8914.html">RFC 8914</a> already names
  * the condition, {@link #extendedDnsErrorCode()} returns that registry code so a resolver can copy it straight into
  * an {@code EDE} option of its own response. The finer-grained reasons this package distinguishes internally have no
- * registry equivalent and return {@link #NO_EXTENDED_DNS_ERROR}.</p>
+ * registry equivalent and return {@link #NO_EXTENDED_DNS_ERROR}.
  *
  * <p>Every reason carries the security state it implies through {@link #impliedStatus()}. Two of those mappings are
- * load-bearing and are not a matter of taste:</p>
+ * load-bearing and are not a matter of taste:
  * <ul>
  *   <li>{@link #UNSUPPORTED_DNSKEY_ALGORITHM} and {@link #UNSUPPORTED_DS_DIGEST_TYPE} imply
  *   {@link DnssecStatus#INSECURE}, never {@link DnssecStatus#BOGUS}, because
@@ -52,7 +52,7 @@ public enum DnssecFailureReason {
      * Section 5.2</a>. Registry code {@code 1}, "Unsupported DNSKEY Algorithm".
      *
      * <p>Note that this is only reached when <em>all</em> of them are unsupported: a zone signed with several
-     * algorithms is validated with whichever one this build understands.</p>
+     * algorithms is validated with whichever one this build understands.
      */
     UNSUPPORTED_DNSKEY_ALGORITHM(1, DnssecStatus.INSECURE),
 
@@ -89,7 +89,7 @@ public enum DnssecFailureReason {
      *
      * <p>Both this and {@link #SIGNATURE_EXPIRED} are decided by serial number arithmetic over the 32-bit fields,
      * per <a href="https://www.rfc-editor.org/rfc/rfc4034.html#section-3.1.5">RFC 4034, Section 3.1.5</a>, so they
-     * depend on the validation clock rather than on a raw comparison.</p>
+     * depend on the validation clock rather than on a raw comparison.
      */
     SIGNATURE_NOT_YET_VALID(8, DnssecStatus.BOGUS),
 
@@ -131,7 +131,7 @@ public enum DnssecFailureReason {
      *
      * <p>Deliberately {@link DnssecStatus#INDETERMINATE} and not {@link DnssecStatus#INSECURE}: a failure to fetch
      * the {@code DS} RRset is exactly what an on-path attacker can arrange, and treating it as proof that the
-     * delegation is unsigned would be a downgrade.</p>
+     * delegation is unsigned would be a downgrade.
      */
     FETCH_FAILED(-1, DnssecStatus.INDETERMINATE),
 
@@ -151,7 +151,7 @@ public enum DnssecFailureReason {
      * by the other side, so an attacker chooses whether a limit is reached; if reaching one produced
      * {@link DnssecStatus#INSECURE} they would hold a downgrade oracle and could strip DNSSEC from any zone simply
      * by making validation expensive. The validation deadline of {@link DnssecBudget} is treated the same way, for
-     * the same reason.</p>
+     * the same reason.
      */
     LIMIT_EXCEEDED(-1, DnssecStatus.BOGUS),
 
@@ -175,7 +175,7 @@ public enum DnssecFailureReason {
      *
      * <p>The key tag of <a href="https://www.rfc-editor.org/rfc/rfc4034.html#appendix-B">RFC 4034, Appendix B</a> is
      * a checksum, not an identifier: several keys may share one, and a match is a hint about which key to try
-     * rather than a fact about which key signed. See {@link DnssecLimits#maxDnskeysPerKeyTag()}.</p>
+     * rather than a fact about which key signed. See {@link DnssecLimits#maxDnskeysPerKeyTag()}.
      */
     KEY_TAG_NO_MATCH(-1, DnssecStatus.BOGUS),
 
@@ -192,7 +192,7 @@ public enum DnssecFailureReason {
      * <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-5.2">RFC 4035, Section 5.2</a>.
      *
      * <p>Not to be confused with {@link #UNSUPPORTED_DS_DIGEST_TYPE}: here the validator could compute the digest
-     * and it did not match, which is a proof of inconsistency.</p>
+     * and it did not match, which is a proof of inconsistency.
      */
     DS_MISMATCH(-1, DnssecStatus.BOGUS),
 
@@ -202,7 +202,7 @@ public enum DnssecFailureReason {
      * <a href="https://www.rfc-editor.org/rfc/rfc4035.html#section-5.2">RFC 4035, Section 5.2</a>.
      *
      * <p>This is the one route to {@link DnssecStatus#INSECURE} that rests on a signed proof of absence rather than
-     * on the validator's own inability to evaluate something.</p>
+     * on the validator's own inability to evaluate something.
      */
     UNSIGNED_DELEGATION(-1, DnssecStatus.INSECURE),
 
@@ -215,12 +215,12 @@ public enum DnssecFailureReason {
 
     /**
      * An {@code NSEC3} record asks for more hash iterations than {@link DnssecLimits#maxNsec3Iterations()}.
-     * <a href="https://www.rfc-editor.org/rfc/rfc9276.html#appendix-A">RFC 9276, Appendix A</a> says a validator
+     * <a href="https://www.rfc-editor.org/rfc/rfc9276.html#section-3.2">RFC 9276, Section 3.2</a> says a validator
      * that declines to do that much work should return an insecure answer, which is what this reports.
      *
      * <p>Above the higher {@link DnssecLimits#maxNsec3IterationsHardFail()} threshold RFC 9276 instead calls for a
      * bogus answer; that case is reported as {@link #LIMIT_EXCEEDED}. The two thresholds exist so that the
-     * "insecure" band stays narrow enough not to be a useful downgrade lever.</p>
+     * "insecure" band stays narrow enough not to be a useful downgrade lever.
      */
     NSEC3_ITERATIONS_TOO_HIGH(-1, DnssecStatus.INSECURE),
 
@@ -278,7 +278,7 @@ public enum DnssecFailureReason {
      * <p>Indistinguishable from {@link #UNSUPPORTED_DNSKEY_ALGORITHM} as far as the other side is concerned, so it
      * shares registry code {@code 1} and, for the same RFC 6840 reason, resolves to {@link DnssecStatus#INSECURE}.
      * It is a separate constant because the remedy is different: install a security provider rather than wait for
-     * the zone to roll its algorithm.</p>
+     * the zone to roll its algorithm.
      */
     LOCAL_CRYPTO_UNAVAILABLE(1, DnssecStatus.INSECURE),
 
@@ -287,7 +287,7 @@ public enum DnssecFailureReason {
      *
      * <p>Fails closed to {@link DnssecStatus#BOGUS} rather than to {@link DnssecStatus#INDETERMINATE}: an internal
      * error that some input can reproduce would otherwise be a downgrade oracle, on the same reasoning as
-     * {@link #LIMIT_EXCEEDED}.</p>
+     * {@link #LIMIT_EXCEEDED}.
      */
     INTERNAL_ERROR(-1, DnssecStatus.BOGUS);
 
@@ -315,7 +315,7 @@ public enum DnssecFailureReason {
      *
      * <p>The value is the INFO-CODE field of the {@code EDE} option, so a resolver relaying this verdict can emit it
      * unchanged. It is not unique across reasons: several of the internal reasons describe conditions the registry
-     * lumps together.</p>
+     * lumps together.
      */
     public int extendedDnsErrorCode() {
         return extendedDnsErrorCode;
